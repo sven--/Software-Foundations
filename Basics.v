@@ -1094,12 +1094,14 @@ Check plus'.
     because of this restriction. *)
 
 
+(**
 Fixpoint no_end (n : nat) : nat :=
   match n with
   | 0 => 0
   | n => no_end(n)
   end.
 Fixpoint no_end2 (n : nat) : nat := no_end2(n).
+**)
 
 (* $Date: 2013-12-03 07:45:41 -0500 (Tue, 03 Dec 2013) $ *)
 
