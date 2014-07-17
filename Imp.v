@@ -1276,13 +1276,12 @@ Inductive com : Type :=
   | CAss : id -> aexp -> com
   | CSeq : com -> com -> com
   | CIf : bexp -> com -> com -> com
-  | CWhile : bexp -> com -> com
-  | CFor : com -> bexp -> com -> com -> com.
+  | CWhile : bexp -> com -> com.
 
 Tactic Notation "com_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "SKIP" | Case_aux c "::=" | Case_aux c ";;"
-  | Case_aux c "IFB" | Case_aux c "WHILE" | Case_aux c "FOR"].
+  | Case_aux c "IFB" | Case_aux c "WHILE" ].
 
 (** As usual, we can use a few [Notation] declarations to make things
     more readable.  We need to be a bit careful to avoid conflicts
@@ -1302,8 +1301,6 @@ Notation "'WHILE' b 'DO' c 'END'" :=
   (CWhile b c) (at level 80, right associativity).
 Notation "'IFB' c1 'THEN' c2 'ELSE' c3 'FI'" :=
   (CIf c1 c2 c3) (at level 80, right associativity).
-Notation "'FOR' c1 ',' b ',' c2 'DO' c3 'END'" :=
-  (CFor c1 b c2 c3) (at level 80, right associativity).
 
 (** For example, here is the factorial function again, written as a
     formal definition to Coq: *)
@@ -1380,8 +1377,6 @@ Fixpoint ceval_fun_no_while (st : state) (c : com) : state :=
           else ceval_fun_no_while st c2
     | WHILE b DO c END =>
         st  (* bogus *)
-    | FOR c1, b, c2 DO c3 END =>
-        st
   end.
 (** In a traditional functional programming language like ML or
     Haskell we could write the [WHILE] case as follows:
@@ -1502,27 +1497,13 @@ Inductive ceval : com -> state -> state -> Prop :=
       c / st || st' ->
       (WHILE b DO c END) / st' || st'' ->
       (WHILE b DO c END) / st || st''
-  | E_ForStart : forall (st st' st'' : state) (b : bexp) (c1 c2 c3 : com),
-                  c1 <> SKIP ->
-                  c1 / st || st' ->
-                  (FOR SKIP, b, c2 DO c3 END) / st' || st'' ->
-                  (FOR c1, b, c2 DO c3 END) / st || st''
-  | E_ForLoop : forall (st st' st'' : state) (b : bexp) (c2 c3 : com),
-                  beval st b = true ->
-                  c2 / st || st' ->
-                  (FOR SKIP, b, c2 DO c3 END) / st' || st'' ->
-                  (FOR SKIP, b, c2 DO c3 END) / st || st''
-  | E_ForEnd : forall (st : state) (b : bexp) (c2 c3 : com),
-                  beval st b = false ->
-                  (FOR SKIP, b, c2 DO c3 END) / st || st
   where "c1 '/' st '||' st'" := (ceval c1 st st').
 
 Tactic Notation "ceval_cases" tactic(first) ident(c) :=
   first;
   [ Case_aux c "E_Skip" | Case_aux c "E_Ass" | Case_aux c "E_Seq"
   | Case_aux c "E_IfTrue" | Case_aux c "E_IfFalse"
-  | Case_aux c "E_WhileEnd" | Case_aux c "E_WhileLoop"
-  | Case_aux c "E_ForStart" | Case_aux c "E_ForLoop" | Case_aux c "E_ForEnd" ].
+  | Case_aux c "E_WhileEnd" | Case_aux c "E_WhileLoop" ].
 
 (** *** *)
 (** The cost of defining evaluation as a relation instead of a
@@ -1708,22 +1689,6 @@ Proof.
         SSCase "Proof of assertion". apply IHE1_1; assumption.
       subst st'0.
       apply IHE1_2. assumption.
-  Case "E_ForStart".
-    apply IHE1_2. assert(st' = st'0) as EQ1. apply IHE1_1; assumption.
-    rewrite EQ1. assumption.
-    apply IHE1_2. assert(st = st') as EQ1. inversion E1_1. reflexivity.
-    rewrite <- EQ1. assumption.
-    apply IHE1_2. assert(st' = st2) as EQ1. inversion E1_1. reflexivity.
-    rewrite EQ1.  assumption.
-  Case "E_ForLoop".
-    contradiction H6. reflexivity.
-    apply IHE1_2. assert(st' = st'0) as EQ1. apply IHE1_1; assumption.
-    rewrite EQ1. assumption.
-    rewrite H in H5. inversion H5.
-  Case "E_ForEnd".
-    contradiction H6. reflexivity.
-    rewrite H in H3. inversion H3.
-    reflexivity.
 Qed.
 
 (* ####################################################### *)
@@ -1819,7 +1784,6 @@ Fixpoint no_whiles (c : com) : bool :=
   | c1 ;; c2  => andb (no_whiles c1) (no_whiles c2)
   | IFB _ THEN ct ELSE cf FI => andb (no_whiles ct) (no_whiles cf)
   | WHILE _ DO _ END  => false
-  | FOR c1, b, c2 DO c3 END => false (* andb (andb (no_whiles c1) (no_whiles c2)) (no_whiles c3) *)
   end.
 
 (** This property yields [true] just on programs that
