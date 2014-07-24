@@ -219,15 +219,15 @@ These decorations were constructed as follows:
 (** Fill in valid decorations for the following program:
    {{ True }}
   IFB X <= Y THEN
-      {{                         }} ->>
-      {{                         }}
+      {{ True /\ (X <= Y)        }} ->>
+      {{ Y = X + (Y - X)         }}
     Z ::= Y - X
-      {{                         }}
+      {{ Y = X + Z               }}
   ELSE
-      {{                         }} ->>
-      {{                         }}
+      {{ True /\ ~(X <= Y)       }} ->>
+      {{ (X + Z) = (X + Z)       }}
     Y ::= X + Z
-      {{                         }}
+      {{ Y = X + Z               }}
   FI
     {{ Y = X + Z }}
 *)
@@ -275,6 +275,19 @@ Theorem reduce_to_zero_correct' :
   reduce_to_zero'
   {{fun st => st X = 0}}.
 Proof.
+  (*
+  unfold reduce_to_zero'.
+  eapply hoare_consequence_post.
+  apply hoare_while.
+  eapply hoare_consequence_pre.
+  apply hoare_asgn.
+  constructor.
+  unfold assert_implies, bassn, not. intros.
+  my_inversion H.
+  simpl in H1.
+  destruct (st X). reflexivity. contradiction H1. simpl. reflexivity.
+  *)
+
   unfold reduce_to_zero'.
   (* First we need to transform the postcondition so
      that hoare_while will apply. *)
@@ -520,9 +533,25 @@ Proof.
       {{ Y = m }}
     Write an informal decorated program showing that this is correct. *)
 
-(* FILL IN HERE *)
-(** [] *)
+(*
+      {{ X = m }}
+    Y ::= 0;
+      {{ X = m /\ Y = 0 }} ->>
+      {{ I }}
+    WHILE X <> 0 DO
+        {{ I /\ X <> 0 }} ->>
+        {{ I[Y |-> Y+1][X |-> X-1]}}
+      X ::= X - 1;
+        {{ I[Y |-> Y+1]}}
+      Y ::= Y + 1;
+        {{ I }}
+    END
+      {{ I /\ ~(X <> 0) }} ->>
+      {{ Y = m }}
 
+   I : X+Y = m.
+*)
+    
 (* ####################################################### *)
 (** ** Exercise: Slow Addition *)
 
@@ -539,9 +568,22 @@ Proof.
     a precondition and postcondition that give an appropriate
     specification of [add_slowly]; then (informally) decorate the
     program accordingly. *)
+(*
+  {{ X = n /\ Z = m }} ->>
+  {{ I }}
+  WHILE X <> 0 DO
+     {{ I /\ X <> 0 }} ->>
+     {{ I[X |-> X-1][Z |-> Z+1] }}
+     Z ::= Z + 1;
+     {{ I[X |-> X-1] }}
+     X ::= X - 1
+     {{ I }}
+  END
+  {{ I /\ ~(X <> 0) }} ->>
+  {{ X = 0 /\ Z = n+m }}
 
-(* FILL IN HERE *)
-(** [] *)
+  I : X+Z = n+m  
+*)
 
 (* ####################################################### *)
 (** ** Example: Parity *)
@@ -619,8 +661,39 @@ Theorem parity_correct : forall m,
   END
     {{ fun st => st X = parity m }}.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  remember (fun st => parity (st X) = parity m) as I.
+  apply hoare_consequence_pre with (P':=I). 
+  eapply hoare_consequence_post.
+  apply hoare_while.
+
+  eapply hoare_consequence_pre.
+  apply hoare_asgn.
+  unfold assn_sub, bassn, assert_implies. intros. simpl. my_inversion H.
+  rewrite update_eq. rewrite <- H0. apply parity_ge_2.
+  simpl in H1; destruct (st X) eqn:e; inversion H1; destruct n eqn:e2; inversion H1; omega.
+  (*
+  eapply hoare_asgn.
+  constructor.
+  reflexivity.
+*)
+
+  unfold assert_implies, bassn. intros. my_inversion H. rewrite <- H0.
+  rewrite parity_lt_2. reflexivity.
+  unfold not. intro. apply H1. my_inversion H. rewrite <- H3. reflexivity.
+  rewrite <- H2. my_inversion H3. reflexivity. reflexivity.
+
+  (*
+  unfold hoare_triple, bassn, assn_sub. intros. my_inversion H.
+  my_inversion H0. rewrite update_eq. (* unfold update; simpl. *)
+  rewrite <- H. apply parity_ge_2.
+(*
+  remember (st X) as val.
+  induction H1.*)
+  simpl in H1; destruct (st X) eqn:e; inversion H1; destruct n eqn:e2; inversion H1; omega.
+*)
+  rewrite HeqI. unfold assert_implies. intros. rewrite H. reflexivity.
+Qed.
 
 (* ####################################################### *)
 (** ** Example: Finding Square Roots *)
@@ -764,6 +837,10 @@ Proof.
     1*2*...*n]).  Here is an Imp program that calculates the factorial
     of the number initially stored in the variable [X] and puts it in
     the variable [Y]:
+
+
+
+
     {{ X = m }} ;
   Y ::= 1
   WHILE X <> 0
@@ -773,26 +850,31 @@ Proof.
   END
     {{ Y = m! }}
 
+
+
+
+
     Fill in the blanks in following decorated program:
     {{ X = m }} ->>
-    {{                                      }}
+    {{ I[Y |-> 1] /\ X = m                     }} (a)
   Y ::= 1;
-    {{                                      }}
+    {{ I                                       }}
   WHILE X <> 0
-  DO   {{                                      }} ->>
-       {{                                      }}
+  DO   {{ I /\ X <> 0                          }} ->>
+       {{ I[X |-> X-1][Y |-> Y*X]              }} (b)
      Y ::= Y * X;
-       {{                                      }}
+       {{ I[X |-> X-1]                         }}
      X ::= X - 1
-       {{                                      }}
+       {{ I                                    }}
   END
-    {{                                      }} ->>
-    {{ Y = m! }}
+    {{ I /\ ~(X <> 0)                          }} ->>
+    {{ Y = m! }} (c)
+
+I : Y = m! / x!
+(a) : OK
+(b) : OK
+(c) : OK
 *)
-
-
-(** [] *)
-
 
 (* ####################################################### *)
 (** ** Exercise: Min *)
@@ -810,29 +892,64 @@ Proof.
   plus, as usual, standard high-school algebra.
 
   {{ True }} ->>
-  {{                    }}
+  {{ I[Z |-> 0][Y |-> b][X |-> a] }} (#######a)
   X ::= a;
-  {{                       }}
+  {{ I[Z |-> 0][Y |-> b]   }}
   Y ::= b;
-  {{                       }}
+  {{ I[Z |-> 0]            }}
   Z ::= 0;
-  {{                       }}
+  {{ I                     }}
   WHILE (X <> 0 /\ Y <> 0) DO
-  {{                                     }} ->>
-  {{                                }}
+  {{ I /\ X <> 0 /\ Y <> 0 }} ->>
+  {{ I[Z |-> Z+1][Y |-> Y-1][X -> X-1] }} (######b)
   X := X - 1;
-  {{                            }}
+  {{ I[Z |-> Z+1][Y |-> Y-1] }}
   Y := Y - 1;
-  {{                        }}
+  {{ I[Z |-> Z+1] }}
   Z := Z + 1;
-  {{                       }}
+  {{ I }}
   END
-  {{                            }} ->>
+  {{ I /\ ~((X <> 0) /\ (Y <> 0))                }} ->> (#######c)
   {{ Z = min a b }}
+
+  I : (min X Y) + Z = min a b
+(a) : OK
+(b) : min (X-1) (Y-1) + Z + 1 = min a b
+<= min (X-1) (Y-1) + Z + 1 = (min X Y) + Z
+lemma 2. OK
+(c) (x=0 \/ y=0) -> min x y = 0.
+~((X <> 0) /\ (Y <> 0)) -> (X=0 \/ Y=0) (without de_morgan.)
+lemma 1.
+OK
+
+
+Definition peirce := forall P Q: Prop, 
+  ((P->Q)->P)->P.
+Definition classic := forall P:Prop, 
+  ~~P -> P.
+Definition excluded_middle := forall P:Prop, 
+  P \/ ~P.
+Definition de_morgan_not_and_not := forall P Q:Prop, 
+  ~(~P /\ ~Q) -> P\/Q.
+Definition implies_to_or := forall P Q:Prop, 
+  (P->Q) -> (~P\/Q).
 *)
 
-
-
+Lemma nat_de_morgan : forall x y,
+  ~((x <> 0) /\ (y <> 0)) -> (x = 0 \/ y = 0).
+Proof.
+  unfold not.
+  intros.
+  destruct x. left. reflexivity.
+  right.
+  destruct y. reflexivity.
+  contradiction H.
+  split.
+  intros.
+  inversion H0.
+  intros.
+  inversion H0.
+Qed.
 
 (** **** Exercise: 3 stars (two_loops) *)
 (** Here is a very inefficient way of adding 3 numbers:
@@ -852,35 +969,58 @@ Proof.
     following decorated program.
 
     {{ True }} ->>
-    {{                                        }}
+    {{ I[Z |-> c][Y |-> 0][X |-> 0] (#######Ia)
   X ::= 0;
-    {{                                        }}
+    {{ I[Z |-> c][Y |-> 0]
   Y ::= 0;
-    {{                                        }}
+    {{ I[Z |-> c]
   Z ::= c;
-    {{                                        }}
+    {{ I
   WHILE X <> a DO
-      {{                                        }} ->>
-      {{                                        }}
+      {{ I /\ X <> a                            }} ->>
+      {{ I[Z |-> Z+1][X |-> X+1] (#########Ib)
     X ::= X + 1;
-      {{                                        }}
+      {{ I[Z |-> Z+1]
     Z ::= Z + 1
-      {{                                        }}
+      {{ I
   END;
-    {{                                        }} ->>
-    {{                                        }}
+    {{ I /\ ~(X <> a)                         }} ->>
+    {{ J                                      }} (########Ic, Ja)
   WHILE Y <> b DO
-      {{                                        }} ->>
-      {{                                        }}
+      {{ J /\ Y <> b                            }} ->>
+      {{ J[Z |-> Z+1][Y -> Y+1] (###### Jb)
     Y ::= Y + 1;
-      {{                                        }}
+      {{ J[Z |-> Z+1]
     Z ::= Z + 1
-      {{                                        }}
+      {{ J
   END
-    {{                                        }} ->>
-    {{ Z = a + b + c }}
+    {{ J /\ ~(Y <> b)                           }} ->>
+    {{ Z = a + b + c }} (###### Jc)
+
+I : Z-X = c /\ Y = 0
+J : Z-Y = a+c
+
+Ia    : OK
+Ib    : OK
+Ic,Ja : OK
+Jb    : OK
+Jc    : OK
 *)
 
+Lemma nat_double_negation : forall x a : nat,
+  ~(x <> a) -> x = a.
+Proof.
+  unfold not.
+  induction x; intros.
+  destruct a. reflexivity. contradiction H. intros. inversion H0.
+  destruct a. contradiction H. intros. inversion H0.
+  rewrite IHx with (a). reflexivity.
+  intros.
+  apply H.
+  intros.
+  apply H0.
+  inversion H1. reflexivity.
+Qed.
 
 (* ####################################################### *)
 (** ** Exercise: Power Series *)
@@ -899,7 +1039,39 @@ Proof.
   END
     Write a decorated program for this. *)
 
-(* FILL IN HERE *)
+(*
+a(m) : 2^m
+series(m) : a(0) + .. + a(m)
+
+
+  {{ True }} ->>
+  {{ I[Z |-> 1][Y |-> 1][X |-> 0] }} (######Ia)
+  X ::= 0;
+  Y ::= 1;
+  Z ::= 1;
+  WHILE X <> m DO
+    {{ I /\ X <> m }} ->>
+    {{ I[X |-> X+1][Y |-> Y+Z][Z |-> 2*Z] }} (######Ib)
+    Z ::= 2 * Z;
+    Y ::= Y + Z;
+    X ::= X + 1;
+  END
+  {{ I /\ X = m }} ->>
+  {{ X = m /\ Y = series(m) /\ Z = a(m) }} (######Ic)
+
+I : Y = series(X) /\ Z = a(X)
+
+Ia: 1 = series(0) /\ 1 = a(0)
+OK.
+
+Ib:
+Y = series(X) /\ Z = a(X)
+->>
+Y+2*Z = series(X+1) /\ 2*Z = a(X+1)
+OK.
+
+Ic: OK.
+*)
 
 (* ####################################################### *)
 (** * Weakest Preconditions (Advanced) *)
@@ -930,6 +1102,7 @@ Proof.
     whenever [P'] is an assertion such that [{{P'}} c {{Q}}], we have
     [P' st] implies [P st] for all states [st].  *)
 
+(* is the weakest precondition *)
 Definition is_wp P c Q :=
   {{P}} c {{Q}} /\
   forall P', {{P'}} c {{Q}} -> (P' ->> P).
@@ -943,25 +1116,25 @@ Definition is_wp P c Q :=
 (** What are the weakest preconditions of the following commands
    for the following postconditions?
   1) {{ ? }}  SKIP  {{ X = 5 }}
-
+X = 5
   2) {{ ? }}  X ::= Y + Z {{ X = 5 }}
-
+Y+Z = 5
   3) {{ ? }}  X ::= Y  {{ X = Y }}
-
+True
   4) {{ ? }}
      IFB X == 0 THEN Y ::= Z + 1 ELSE Y ::= W + 2 FI
      {{ Y = 5 }}
-
+(X = 0 /\ Z = 4) \/ (X <> 0 /\ W = 3)
   5) {{ ? }}
      X ::= 5
      {{ X = 0 }}
-
+False
   6) {{ ? }}
      WHILE True DO X ::= 0 END
      {{ X = 0 }}
+False
 *)
-(* FILL IN HERE *)
-(** [] *)
+
 
 (** **** Exercise: 3 stars, advanced, optional (is_wp_formal) *)
 (** Prove formally using the definition of [hoare_triple] that [Y <= 4]
@@ -972,8 +1145,16 @@ Theorem is_wp_example :
   is_wp (fun st => st Y <= 4)
     (X ::= APlus (AId Y) (ANum 1)) (fun st => st X <= 5).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  unfold is_wp, hoare_triple, assert_implies.
+  split; intros.
+  my_inversion H. rewrite update_eq. omega.
+  generalize (H st (update st X (aeval st (APlus (AId Y) (ANum 1))))); intro.
+
+  assert(G : update st X (aeval st (APlus (AId Y) (ANum 1))) X <= 5).
+  apply H1.
+  constructor. simpl. reflexivity. assumption.
+  simpl in G. rewrite update_eq in G. omega.
+Qed.
 
 (** **** Exercise: 2 stars, advanced (hoare_asgn_weakest) *)
 (** Show that the precondition in the rule [hoare_asgn] is in fact the
@@ -982,8 +1163,18 @@ Proof.
 Theorem hoare_asgn_weakest : forall Q X a,
   is_wp (Q [X |-> a]) (X ::= a) Q.
 Proof.
-(* FILL IN HERE *) Admitted.
-(** [] *)
+  unfold is_wp, assn_sub, assert_implies, hoare_triple.
+  split; intros.
+  my_inversion H. assumption.
+  apply H with (st).
+  constructor.
+  reflexivity.
+  assumption.
+(*
+  generalize (H st); intro.
+  apply H1.
+*)
+Qed.
 
 (** **** Exercise: 2 stars, advanced, optional (hoare_havoc_weakest) *)
 (** Show that your [havoc_pre] rule from the [himp_hoare] exercise
@@ -995,7 +1186,13 @@ Lemma hoare_havoc_weakest : forall (P Q : Assertion) (X : id),
   {{ P }} HAVOC X {{ Q }} ->
   P ->> havoc_pre X Q.
 Proof.
-(* FILL IN HERE *) Admitted.
+  unfold hoare_triple, assert_implies, havoc_pre.
+  intros.
+  apply H with (st).
+  constructor.
+  assumption.
+Qed.
+
 End Himp2.
 (** [] *)
 
@@ -1219,6 +1416,85 @@ Fixpoint verification_conditions (P : Assertion) (d:dcom) : Prop :=
 Theorem verification_correct : forall d P,
   verification_conditions P d -> {{P}} (extract d) {{post d}}.
 Proof.
+(*
+  dcom_cases (induction d) Case; intros; subst; try (inversion H0; subst; clear H0); simpl in *.
+  Case "Skip".
+  eapply hoare_consequence_pre.
+  apply hoare_skip. assumption.
+  Case "Seq".
+  my_inversion H.
+  eapply hoare_seq.
+  generalize (IHd2 (post d1)); intro. generalize (H H1); intro.
+  apply H2.
+  generalize (IHd1 P H0); intro.
+  assumption.
+  Case "Asgn".
+  eapply hoare_consequence_pre.
+  apply hoare_asgn.
+  assumption.
+  Case "If".
+  inversion H as [H1 [H2 [[H3a H3b] [[H4a H4b] [H5 H6]]]]]; clear H.
+  (*
+  my_inversion H. my_inversion H1. my_inversion H2. my_inversion H3. my_inversion H4.
+*)
+  apply hoare_if.
+  
+  eapply hoare_consequence_post.
+  generalize (IHd1 a H5); intro.
+  eapply hoare_consequence_pre in H.
+  apply H. assumption. assumption.
+
+  eapply hoare_consequence_post.  
+  generalize (IHd2 a0 H6); intro.
+  eapply hoare_consequence_pre in H.
+  apply H. assumption. assumption.
+
+  Case "While".
+  inversion H as [H1 [[H2a H2b] [[H3a H3b] H4]]]; clear H.
+
+  eapply hoare_consequence_post.
+  eapply hoare_consequence_pre.
+  apply hoare_while.
+  eapply hoare_consequence_pre.
+  eauto. (******** magic here!!!!!!!!!!!! *********)
+  assumption.
+  assumption.
+  assumption.
+
+  
+  (*
+  eapply hoare_consequence_pre; eauto.
+  eapply hoare_consequence_post; eauto.
+  apply hoare_while.
+  eapply hoare_consequence_pre; eauto.
+*)
+(*    
+  eapply hoare_consequence_post.
+  eapply hoare_consequence_pre.
+  apply hoare_while.
+  eapply hoare_consequence_post.
+  eapply hoare_consequence_pre.
+  apply IHd.
+  apply H4.
+  apply H2b.
+  unfold assert_implies; intros; assumption.
+  assumption.
+  assumption.
+*)
+  
+  Case "Pre".
+  my_inversion H.
+  eapply hoare_consequence_pre.
+  apply IHd. apply H1. assumption.
+
+  Case "Post".
+  my_inversion H.
+  eapply hoare_consequence_post.
+  apply IHd. assumption. assumption.
+
+  *)
+
+  
   dcom_cases (induction d) Case; intros P H; simpl in *.
   Case "Skip".
     eapply hoare_consequence_pre.
@@ -1264,7 +1540,10 @@ Qed.
 (** The propositions generated by [verification_conditions] are fairly
     big, and they contain many conjuncts that are essentially trivial. *)
 
+Check (verification_conditions (fun st => True) dec_while).
+Eval compute in (verification_conditions (fun st => True) dec_while).
 Eval simpl in (verification_conditions (fun st => True) dec_while).
+
 (**
 ==>
 (((fun _ : state => True) ->> (fun _ : state => True)) /\
@@ -1347,6 +1626,12 @@ Proof. verify. Qed.
 (** Another example (formalizing a decorated program we've seen
     before): *)
 
+(*
+Definition IS (p m : nat) : Assertion :=
+  (fun st => st Z - st X = p - m)
+  .
+*)
+
 Example subtract_slowly_dec (m:nat) (p:nat) : dcom := (
     {{ fun st => st X = m /\ st Z = p }} ->>
     {{ fun st => st Z - st X = p - m }}
@@ -1360,6 +1645,7 @@ Example subtract_slowly_dec (m:nat) (p:nat) : dcom := (
   END
     {{ fun st => st Z - st X = p - m /\ st X = 0 }} ->>
     {{ fun st => st Z = p - m }}
+    (* {{ IS p m }} didnt work, verify tactic cannot unfold it *)
 ) % dcom.
 
 Theorem subtract_slowly_dec_correct : forall m p,
@@ -1376,13 +1662,35 @@ Proof. intros m p. verify. (* this grinds for a bit! *) Qed.
     Write a _formal_ version of this decorated program and prove it
     correct. *)
 
-Example slow_assignment_dec (m:nat) : dcom :=
-(* FILL IN HERE *) admit.
+Example slow_assignment_dec (m:nat) : dcom := (
+      {{ fun st => st X = m }}
+    Y ::= (ANum 0)
+      {{ fun st => st X = m /\ st Y = 0 }} ->>
+      {{ fun st => st X + st Y = m }} ;;
+    WHILE BNot (BEq (AId X) (ANum 0))
+    DO
+        {{ fun st => st X + st Y = m /\ (st X) <> 0 }} ->>
+(*        {{ (fun st => st X + st Y = m)
+             [X |-> AMinus (AId X) (ANum 1)]
+             [Y |-> APlus (AId Y) (ANum 1)] }} *)
+        {{ fun st => (st X - 1) + (st Y + 1) = m}} 
+      X ::= AMinus (AId X) (ANum 1)
+        {{ fun st => st X + (st Y + 1) = m}} ;; 
+(*        {{ (fun st => st X + st Y = m)
+             [Y |-> APlus (AId Y) (ANum 1)] }} ;; *)
+      Y ::= APlus (AId Y) (ANum 1)
+        {{ fun st => st X + st Y = m}}
+    END
+      {{ fun st => st X + st Y = m /\ ~((st X) <> 0) }} ->>
+      {{ fun st => st Y = m }}
+                                             ) % dcom.
+
+(* assn_sub ([ |-> ]) notation didn't work, probably because
+"verify" tactic haven't care it properly. *)
 
 Theorem slow_assignment_dec_correct : forall m,
   dec_correct (slow_assignment_dec m).
-Proof. (* FILL IN HERE *) Admitted.
-(** [] *)
+Proof. intros. verify. Qed.
 
 (** **** Exercise: 4 stars, advanced (factorial_dec)  *)
 (** Remember the factorial function we worked with before: *)
@@ -1397,9 +1705,138 @@ Fixpoint real_fact (n:nat) : nat :=
     program that implements the factorial function and prove it
     correct. *)
 
-(* FILL IN HERE *)
-(** [] *)
 
+Example factorial (m:nat) : dcom := (
+      {{ fun st => st X = m }} ->>
+      {{ fun st => real_fact (st X) * 1 = real_fact m }}
+    Y ::= (ANum 1)
+      {{ fun st => real_fact (st X) * (st Y) = real_fact m }} ;;
+    WHILE BNot (BEq (AId X) (ANum 0))
+    DO
+        {{ fun st => real_fact (st X) * (st Y) = real_fact m /\ st X <> 0}} ->>
+        {{ fun st => real_fact (st X - 1) * (st Y * st X) = real_fact m }}
+      Y ::= AMult (AId Y) (AId X)
+        {{ fun st => real_fact (st X - 1) * (st Y) = real_fact m }} ;;
+      X ::= AMinus (AId X) (ANum 1)
+        {{ fun st => real_fact (st X) * (st Y) = real_fact m }}
+    END
+      {{ fun st => real_fact (st X) * (st Y) = real_fact m /\ ~(st X <> 0) }} ->>
+      {{ fun st => (st Y) = real_fact m }}
+      ) % dcom.
+
+
+Lemma factorial_zero : forall n : nat,
+  real_fact n = 0 -> n = 0.
+Proof.
+  induction n; intros; simpl; auto.
+  inversion H; clear H.
+  apply plus_is_O in H1.
+  my_inversion H1.
+  apply IHn in H.
+  rewrite H.
+  reflexivity.
+Qed.
+
+Lemma factorial_decomp : forall n : nat,
+  n <> 0 ->
+  (real_fact (n-1)) * n  = real_fact n.
+Proof.
+  intros.
+  unfold real_fact.
+  destruct n eqn:e.
+  omega.
+  subst. simpl. fold real_fact.
+  rewrite mult_comm.
+  rewrite <- minus_n_O.
+  replace (S n0) with (n0 + 1).
+  rewrite mult_plus_distr_r.
+  omega.
+  omega.
+Qed.
+                        
+(*
+  intros. destruct (real_fact n) eqn : e.
+  apply factorial_zero in e. rewrite e in H. contradiction H. auto.
+  rewrite <- e. 
+
+  intros. induction n. omega. simpl.
+  rewrite <- minus_n_O.
+  replace (S n) with (n + 1).
+  rewrite mult_plus_distr_l.
+  rewrite mult_one.
+Qed.
+*)
+
+(*
+Tactic Notation "my_verify" tactic(my_hypo) :=
+  apply verification_correct;
+  repeat split;
+  simpl; unfold assert_implies;
+  unfold bassn in *; unfold beval in *; unfold aeval in *;
+  unfold assn_sub; intros;
+  repeat rewrite update_eq;
+  repeat (rewrite update_neq; [| (intro X; inversion X)]);
+  simpl in *;
+  repeat match goal with [H : _ /\ _ |- _] => destruct H end;
+  repeat rewrite not_true_iff_false in *;
+  repeat rewrite not_false_iff_true in *;
+  repeat rewrite negb_true_iff in *;
+  repeat rewrite negb_false_iff in *;
+  repeat rewrite beq_nat_true_iff in *;
+  repeat rewrite beq_nat_false_iff in *;
+  repeat rewrite ble_nat_true_iff in *;
+  repeat rewrite ble_nat_false_iff in *;
+  repeat rewrite my_hypo in *;
+  try subst;
+  repeat
+    match goal with
+      [st : state |- _] =>
+        match goal with
+          [H : st _ = _ |- _] => rewrite -> H in *; clear H
+        | [H : _ = st _ |- _] => rewrite <- H in *; clear H
+        end
+    end;
+  try eauto; try omega.
+*)
+
+Theorem factorial_correct : forall m,
+  dec_correct (factorial m).
+Proof.
+  (*
+       intros.
+       apply verification_correct.
+       repeat split; unfold assert_implies;
+(* instead of unfold real_fact, use a lemma exposing the nature of real_fact *)
+       intros; try (inversion H; subst; clear H); try reflexivity.
+       rewrite H.
+*)
+(*     intros. my_verify (real_fact). *)
+
+  intros; verify.
+  rewrite (mult_comm (st Y) (st X)).
+  rewrite mult_assoc.
+  rewrite factorial_decomp.
+  assumption.
+  assumption.
+  apply nat_double_negation in H0.
+  rewrite H0 in H. simpl in *. rewrite <- H. auto.
+
+  (*
+  intros. my_verify factorial_decomp.
+  rewrite mult_comm.
+  rewrite factorial_decomp with (n:=(st X)).
+*)
+
+  (*
+       assert(G : forall a, AMult (ANum a) (ANum 1) = ANum a).
+       admit.
+       apply G.
+       rewrite <- H.
+       admit.
+       
+       verify. admit. Qed.
+*)
+Qed.
 
 
 (* $Date: 2014-04-03 23:55:40 -0400 (Thu, 03 Apr 2014) $ *)
