@@ -1,6 +1,7 @@
 (** * Types: Type Systems *)
 
 Require Export Smallstep.
+Ltac inv H := inversion H; subst; clear H.
 
 Hint Constructors multi.  
 
@@ -191,8 +192,20 @@ Hint Unfold stuck.
 Example some_term_is_stuck :
   exists t, stuck t.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  exists (tif tzero tzero tzero).
+  split.
+  unfold normal_form, not.
+  intros.
+  inv H.
+  inv H0.
+  inv H4.
+
+  unfold not.
+  intros.
+  inv H.
+  inv H0.
+  inv H0.
+Qed.
 
 (** However, although values and normal forms are not the same in this
     language, the former set is included in the latter.  This is
@@ -211,20 +224,153 @@ Proof.
 Lemma value_is_nf : forall t,
   value t -> step_normal_form t.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  inv H;
+  unfold normal_form, not;
+  intros;
+  inv H. inv H0. inv H1. inv H1.
+  generalize dependent x.
+  induction H0; intros.
+  inv H1.
+  inv H1.
+  generalize (IHnvalue t1'); intro T.
+  apply T. auto.
+Qed.
 
 
 (** **** Exercise: 3 stars, optional (step_deterministic) *)
 (** Using [value_is_nf], we can show that the [step] relation is
     also deterministic... *)
 
+
+Ltac find_eqn :=
+  match goal with
+    H1: forall x, ?P x -> ?L = ?R, H2: ?P ?X |- _ => 
+         rewrite (H1 X H2) in * 
+  end.
+Ltac rwinv H1 H2 := rewrite H1 in H2; inv H2. 
+Ltac find_rwinv :=
+  match goal with
+    H1: ?E = true, H2: ?E = false |- _ => rwinv H1 H2
+  end.
+
+Ltac value_pre_fail :=
+  match goal with
+    H1: ?E ==> _, H2: value ?E |- _ => inv H1
+  end.
+
+Ltac value_pre :=
+  match goal with
+    | H1: ttrue ==> _             |- _ => inv H1
+    | H1: tfalse ==> _            |- _ => inv H1
+    | H1: tzero ==> _             |- _ => inv H1
+  (*  | H1: tsucc ?t ==> _         |- _ => inv H1 *)
+                                              (*
+    | H1: ?t ==> _, H2: nvalue ?t |- _ => inv H2; inv H1
+    | H1: ?t ==> _, H2: bvalue ?t |- _ => inv H2; inv H1
+*)
+  end.
+(*
+Ltac value_inv :=
+  match goal with
+    | H1: nvalue ?t |- _ => inv H1
+    | H1: bvalue ?t |- _ => inv H1
+  end.
+*)
+(*
+Hint Constructors nvalue.
+Hint Constructors bvalue.
+*)
+(*
+Ltac apply_subst :=
+  match goal with
+    | H1 : forall x, ?P x -> ?L = ?R, H2: ?P
+*)
+(*
+Lemma nvalue_succ_pred : (forall t1 t2,
+  nvalue t1 ->
+  tsucc t1 ==> t2 ->
+  t1 = tpred t2).
+Proof.
+(*
+  unfold not; intros.
+  generalize (H tzero (tsucc tzero)); intro T.
+  assert(G : nvalue tzero) by constructor.
+  apply T in G. inv G.
+  inv G.
+*)
+  
+  intros. generalize dependent t2.
+  induction H; intros.
+  inv H0. inv H1.
+  inv H0. generalize (IHnvalue t1' H2); intro T.
+  rewrite T.
+  inv H2.
+  inv H.
+(*
+   tsucc (tpred (tsucc t1'0)) = tpred (tsucc (tsucc t1'0))
+                                      
+  t1 : tm
+  H : nvalue t1
+  t1' : tm
+  H1 : tsucc t1 ==> t1'
+  ============================
+   t1 = tpred t1'
+*)
+  (* pred -> not nvalue *)
+Qed.
+*)
+Lemma nvalue_not_succ : forall t1 t2,
+(*
+  ~(nvalue t1 ->
+  tsucc t1 ==> t2).
+*)
+  nvalue t1 ->
+(*  ~(tsucc t1 ==> t2). *)
+  tsucc t1 ==> t2 ->
+  False.
+Proof.
+(*  unfold not. *)
+  induction t1; intros; inv H.
+  inv H0; inv H1.
+  inv H0.
+  generalize (IHt1 t1' H2 H1); intro T. auto.
+Qed.
+
 Theorem step_deterministic:
   deterministic step.
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  unfold deterministic.
+  intros.
+  generalize dependent y2.
+  induction H; intros st H2; inv H2;
+  auto; try value_pre; try find_eqn; try value_pre; auto.
 
+  assert(G : False) by (apply (nvalue_not_succ t1 t1' H H1)). inv G.
+  assert(G : False) by (apply (nvalue_not_succ st t1' H1 H)). inv G.  
+  eapply nvalue_not_succ in H. inv H. eauto.
+  eapply nvalue_not_succ in H1. inv H1. eauto.
+(*
+  apply nvalue_succ_pred; auto.
+  symmetry. apply nvalue_succ_pred; auto.
+  eapply nvalue_not_succ in H. unfold not in H. apply H in H1. inv H1.
+  eapply nvalue_not_succ in H. inv H. assumption.
+*)
+(*
+  inv H1. symmetry. apply ST_IszeroSucc. constructor.
+  
+  generalize dependent t1'.
+  induction H; intros. inv H1. inv H0.
+  inv H1. generalize (IHnvalue t1'0 H2); intro T. rewrite T.
+
+
+
+  inv H1.
+  generalize dependent t1'0.
+  induction t1; inv H; intros. inv H2. inv H2.
+  generalize (IHt1 H1 t1' H0); intro T. rewrite T. 
+*)  
+Qed.
 
 
 (* ###################################################################### *)
@@ -338,8 +484,9 @@ Example succ_hastype_nat__hastype_nat : forall t,
   |- tsucc t \in TNat ->
   |- t \in TNat.  
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  induction t; inv H; assumption.
+Qed.
 
 (* ###################################################################### *)
 (** ** Canonical forms *)
@@ -367,12 +514,31 @@ Proof.
   auto.  
 Qed.
 
+Lemma not_TNat_implies_nvalue : 
+  ~(forall t,
+  |- t \in TNat -> nvalue t).
+Proof.
+  unfold not; intros.
+  generalize (H (tif ttrue tzero tzero)); intro T.
+  assert(G : (|-tif ttrue tzero tzero \in TNat)) by repeat constructor.
+  apply T in G. inv G.
+Qed.
 (* ###################################################################### *)
 (** ** Progress *)
 
 (** The typing relation enjoys two critical properties.  The first is
     that well-typed normal forms are values (i.e., not stuck). *)
+(*
+Lemma bvalue_is_value : forall t,
+  bvalue t ->
+  value t.
+Proof. intros. constructor. assumption. Qed.
 
+Lemma nvalue_is_value : forall t,
+  nvalue t ->
+  value t.
+Proof. intros. unfold value. right. assumption. Qed.
+*)
 Theorem progress : forall t T,
   |- t \in T ->
   value t \/ exists t', t ==> t'.
@@ -397,7 +563,32 @@ Proof with auto.
     SCase "t1 can take a step".
       inversion H as [t1' H1].
       exists (tif t1' t2 t3)...
-  (* FILL IN HERE *) Admitted.
+  Case "T_Succ".
+    inv IHHT.
+    SCase "left".
+    left. apply nat_canonical in H. induction H.
+    unfold value; right. repeat constructor.
+    unfold value; right. constructor. constructor. assumption. assumption.
+
+    SCase "right".
+    inv H. right. exists (tsucc x)...
+  Case "T_Pred".
+    inv IHHT.
+    SCase "left".
+    apply nat_canonical in H.
+      inv H. right. exists tzero...
+      right. exists t... assumption.
+    SCase "right".
+      inv H. right. exists (tpred x)...
+  Case "T_Iszero".
+    right. inv IHHT.
+    SCase "left".
+      apply nat_canonical in H; auto.
+      inv H. exists ttrue... exists tfalse...
+      inv H.
+      exists (tiszero x)...
+Qed.
+    
 (** [] *)
 
 (** **** Exercise: 3 stars, advanced (finish_progress_informal) *)
@@ -447,6 +638,47 @@ Proof with auto.
 *)
 (** [] *)
 
+(*
+- Every well-typed normal form is a value.
+*)
+Example nf_is_not_always_value : 
+  ~(forall t, step_normal_form t -> value t).
+Proof.
+  unfold normal_form, not.
+  intros.
+  generalize (H (tif tzero tzero tzero)); intro T.
+  assert(G : (exists t', tif tzero tzero tzero ==> t') -> False).
+  intros. inv H0. inv H1. inv H5.
+  apply T in G.
+  inv G. inv H0. inv H0.
+Qed.
+
+(*
+- Every value is a normal form.
+value_is_nf
+     : forall t : tm, value t -> step_normal_form t
+*)
+
+(*
+- The single-step evaluation relation is
+  a partial function (i.e., it is deterministic).
+
+Theorem step_deterministic:
+  deterministic step.
+
+*)
+
+(*
+- The single-step evaluation relation is a _total_ function.
+
+Theorem step_deterministic:
+  deterministic step.
+*)
+
+
+
+
+
 (* ###################################################################### *)
 (** ** Type Preservation *)
 
@@ -483,8 +715,10 @@ Proof with auto.
       SCase "ST_IfFalse". assumption.
       SCase "ST_If". apply T_If; try assumption.
         apply IHHT1; assumption.
-    (* FILL IN HERE *) Admitted.
-(** [] *)
+    Case "T_Succ". inv HE. apply T_Succ. apply IHHT...
+    Case "T_Pred". inv HE... inv HT...
+    Case "T_Iszero". inv HE...
+Qed.
 
 (** **** Exercise: 3 stars, advanced (finish_preservation_informal) *)
 (** Complete the following proof: *)
@@ -530,8 +764,21 @@ Theorem preservation' : forall t t' T,
   t ==> t' ->
   |- t' \in T.
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  intros.
+  generalize dependent T.
+  induction H0; intros; inv H...
+
+  inv H0. inv H1. assumption.
+  inv H0. inv H2. assumption.
+  inv H0. constructor.
+  inv H0. constructor.
+
+  (*
+  intros.
+  generalize dependent t'.
+  induction H; intros; inv H0...
+*)
+Qed.
 
 (* ###################################################################### *)
 (** ** Type Soundness *)
@@ -546,7 +793,16 @@ Corollary soundness : forall t t' T,
   |- t \in T -> 
   t ==>* t' ->
   ~(stuck t').
-Proof. 
+Proof with auto.
+  (*
+  unfold stuck, not; intros.
+  induction H0; inv H1.
+  apply H2.
+  apply progress in H.
+  inv H... inv H1. unfold normal_form, not in H0. contradiction H0. exists x0...
+
+  apply IHmulti... eapply preservation in H0. apply H0. apply H.
+  *)
   intros t t' T HT P. induction P; intros [R S].
   destruct (progress x T HT); auto.   
   apply IHP.  apply (preservation x y T HT H).
@@ -587,7 +843,9 @@ Qed.
     simple enough that [auto], with appropriate hints, can solve
     them. *)
 
-Hint Constructors astep aval.
+(* Hint Constructors astep aval.*)
+Hint Constructors astep.
+Hint Constructors aval.
 Example astep_example1' : 
   (APlus (ANum 3) (AMult (ANum 3) (ANum 4))) / empty_state 
   ==>a* (ANum 15).
@@ -651,9 +909,9 @@ Theorem normalize_ex : exists e',
   (AMult (ANum 3) (AMult (ANum 2) (ANum 1))) / empty_state 
   ==>a* e'.
 Proof.
-  (* FILL IN HERE *) Admitted.
-
-(** [] *)
+  eexists.
+  normalize.
+Qed.
 
 (** **** Exercise: 1 star, optional (normalize_ex') *)
 (** For comparison, prove it using [apply] instead of [eapply]. *)
@@ -662,8 +920,8 @@ Theorem normalize_ex' : exists e',
   (AMult (ANum 3) (AMult (ANum 2) (ANum 1))) / empty_state 
   ==>a* e'.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  eexists. normalize.
+Qed.
 
 
 (* ###################################################################### *)
@@ -681,8 +939,19 @@ Proof.
 []
 *)
 
-
-
+Theorem not_subject_expansion :
+  ~(forall t t' T,
+  |- t' \in T -> 
+  t ==> t' ->
+  |- t \in T).
+Proof with auto.
+  unfold not; intros.
+  assert(G : |-tzero \in TNat) by constructor.
+  assert(G2 : tif ttrue tzero tfalse ==> tzero) by constructor.
+  generalize (H (tif ttrue tzero tfalse) tzero TNat G G2); intro T.
+  inv T.
+  inv H6.
+Qed.
 
 (** **** Exercise: 2 stars (variation1) *)
 (** Suppose, that we add this new rule to the typing relation: 
@@ -702,6 +971,177 @@ Proof.
 []
 *)
 
+Module variation1.
+Reserved Notation "'|-' t '\in' T" (at level 40).
+
+Inductive has_type : tm -> ty -> Prop :=
+  | T_True : 
+       |- ttrue \in TBool
+  | T_False : 
+       |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T,
+       |- t1 \in TBool ->
+       |- t2 \in T ->
+       |- t3 \in T ->
+       |- tif t1 t2 t3 \in T
+  | T_Zero : 
+       |- tzero \in TNat
+  | T_Succ : forall t1,
+       |- t1 \in TNat ->
+       |- tsucc t1 \in TNat
+  | T_Pred : forall t1,
+       |- t1 \in TNat ->
+       |- tpred t1 \in TNat
+  | T_Iszero : forall t1,
+       |- t1 \in TNat ->
+       |- tiszero t1 \in TBool
+  | T_SuccBool : forall t,
+       |- t \in TBool ->
+       |- tsucc t \in TBool
+where "'|-' t '\in' T" := (has_type t T).
+
+(*
+      - Determinism of [step]
+: not related to type
+*)
+
+(*
+      - Progress
+*)
+
+Theorem not_progress :
+  ~(forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t').
+Proof.
+  unfold not; intros.
+  assert(G : |-tsucc tfalse \in TBool) by repeat constructor.
+  generalize (H (tsucc tfalse) TBool G); intro T.
+  inv T.
+  inv H0. inv H1. inv H1. inv H2. inv H0. inv H1. inv H2.
+Qed.
+
+(*
+      - Preservation
+
+added one more case in "has_type"
+effect on conclusion (|- t' \in T) : more choice. no need to consider
+effect on premise (t ==> t') : no effect
+effect on premise (|- t \in T) : more choice,
+but it is all eliminated in conclusion.
+
+| T_SuccBool : forall tt,
+    |- tt \in TBool ->
+    |- tsucc tt \in TBool
+
+Newly introduced case must be form of
+t := (tsucc tt)
+T := TBool
+
+t' \in TBool.
+| ST_Succ : forall t1 t1' : tm, t1 ==> t1' -> tsucc t1 ==> tsucc t1'
+
+####################### TODO : It is provable, but simple explanation??????????????? #############################################
+*)
+
+Lemma pres : forall tt t',
+  |- (tsucc tt) \in TBool ->
+  (tsucc tt) ==> t' ->
+  |- t' \in TBool.
+Proof with eauto.
+  (*
+  intros. generalize dependent t'.
+  induction H; intros; inv H0; try auto.
+  inv H2... constructor... constructor...
+  inv H2... constructor...
+  constructor... constructor.
+  inv H2. constructor... auto.
+  constructor.
+*)
+  intros. inv H0.
+  induction H2; inv H.
+  constructor. inv H1...
+  constructor. inv H1...
+  inv H1. constructor. constructor... generalize (T_SuccBool t1 H4); intro T. apply IHstep in T. inv T. auto.
+  constructor. apply IHstep in H1. auto.
+  inv H1. inv H2. inv H1.
+  apply T_SuccBool. constructor.
+  apply T_SuccBool. constructor.
+
+  Abort.
+  (*
+  induction H2; intros.
+  inv H1; inv H0; repeat constructor; auto.
+  inv H1; inv H0; repeat constructor; auto.
+  inv H1; inv H0; repeat constructor; auto.
+*)
+  (*
+  induction H2; intros; inv H1; repeat constructor; auto;
+  try inv H0; auto.
+  *)
+(*  
+  apply T_SuccBool.
+  constructor. inv H1.
+  induction H2.
+  inv H0; auto.
+  inv H0; auto.
+  inv H0; auto.
+  constructor; auto. 
+  
+  generalize dependent t1'.
+  induction H0; intros; inv H2.
+  *)
+
+Theorem preservation : forall t t' T,
+  |- t \in T ->
+  t ==> t' ->
+  |- t' \in T.
+Proof with eauto.
+  intros.
+  generalize dependent T.
+  induction H0; intros; inv H...
+
+  constructor...
+  constructor...
+  constructor...
+  inv H0; constructor...
+  inv H0; constructor...
+  inv H2. inv H0...
+  constructor...
+  constructor...
+  inv H0. constructor...
+  inv H0. constructor...
+  constructor...
+Qed.
+
+Theorem not_preservation : ~(forall t t' T,
+  |- t \in T ->
+  t ==> t' ->
+  |- t' \in T).
+Proof with eauto.
+  unfold not; intros.
+  intros.
+  assert(G: |-tsucc (tif ttrue tfalse tfalse) \in TBool).
+  repeat constructor...
+  assert(G2: tsucc (tif ttrue tfalse tfalse) ==> tsucc tfalse).
+  repeat constructor...
+  generalize (H (tsucc (tif ttrue tfalse tfalse)) (tsucc tfalse) TBool G G2); intro T.
+Abort.
+(*
+Lemma T_SuccBool_cannot_step : forall t,
+  |- t \in TBool ->
+  ~(exists t', (tsucc t) ==> t').
+Proof with eauto.
+  unfold not; intros.
+  inv H0. inv H1.
+
+  generalize dependent t1'.
+  induction H; intros...
+  inv H2. inv H2. inv H2.
+Qed.
+*)
+End variation1.
+
 (** **** Exercise: 2 stars (variation2) *)
 (** Suppose, instead, that we add this new rule to the [step] relation: 
       | ST_Funny1 : forall t2 t3,
@@ -711,6 +1151,149 @@ Proof.
 
 []
 *)
+Lemma modusponens: forall (P Q: Prop), P -> (P -> Q) -> Q.
+Proof. intros. apply H0. assumption. Qed.
+Ltac exploit x :=
+    refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _) _)
+ || refine (modusponens _ _ (x _ _) _)
+ || refine (modusponens _ _ (x _) _).
+
+
+
+Module variation2.
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_IfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (tif tfalse t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+  | ST_Succ : forall t1 t1',
+      t1 ==> t1' ->
+      (tsucc t1) ==> (tsucc t1')
+  | ST_PredZero :
+      (tpred tzero) ==> tzero
+  | ST_PredSucc : forall t1,
+      nvalue t1 ->
+      (tpred (tsucc t1)) ==> t1
+  | ST_Pred : forall t1 t1',
+      t1 ==> t1' ->
+      (tpred t1) ==> (tpred t1')
+  | ST_IszeroZero :
+      (tiszero tzero) ==> ttrue
+  | ST_IszeroSucc : forall t1,
+       nvalue t1 ->
+      (tiszero (tsucc t1)) ==> tfalse
+  | ST_Iszero : forall t1 t1',
+      t1 ==> t1' ->
+      (tiszero t1) ==> (tiszero t1')
+  | ST_Funny1 : forall t2 t3,
+      (tif ttrue t2 t3) ==> t3
+where "t1 '==>' t2" := (step t1 t2).
+
+Theorem not_step_deterministic:
+  ~(deterministic step).
+Proof.
+  unfold deterministic, not.
+  intros.
+  generalize (H (tif ttrue tzero tfalse) tzero tfalse); intro T.
+  exploit T.
+  constructor. constructor. intros. inv H0.
+Qed.
+
+Theorem progress :
+  (forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t').
+Proof with eauto.
+  induction t; intros.
+  left...
+  left...
+  inv H.
+  generalize (IHt1 TBool H3); intro T1.
+  generalize (IHt2 T H5); intro T2.
+  generalize (IHt3 T H6); intro T3.
+  inv T1. apply bool_canonical in H...
+  inv H; right. exists t2; constructor. exists t3; constructor.
+  inv H; right. exists (tif x t2 t3); constructor...
+
+  left...
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H. right. exists (tsucc x). constructor...
+
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists (tzero). constructor...
+  exists t0; constructor...
+
+  inv H.
+  right. exists (tpred x). constructor...
+  
+  inv H.
+  generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists ttrue; constructor. exists tfalse; constructor...
+  inv H. right. exists (tiszero x); constructor...
+Qed.
+
+Theorem preservation : forall t t' T,
+  |- t \in T ->
+  t ==> t' ->
+  |- t' \in T.
+Proof with eauto.
+  intros.
+  generalize dependent T.
+  induction H0; intros; inv H...
+
+  inv H0. inv H1. assumption.
+  inv H0. inv H2. assumption.
+  inv H0. constructor.
+  inv H0. constructor.
+
+  (*
+  intros.
+  generalize dependent t'.
+  induction H; intros; inv H0...
+*)
+Qed.
+
+End variation2.
 
 (** **** Exercise: 2 stars, optional (variation3) *)
 (** Suppose instead that we add this rule:
@@ -723,6 +1306,106 @@ Proof.
 []
 *)
 
+Module variation3.
+
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_IfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (tif tfalse t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+  | ST_Succ : forall t1 t1',
+      t1 ==> t1' ->
+      (tsucc t1) ==> (tsucc t1')
+  | ST_PredZero :
+      (tpred tzero) ==> tzero
+  | ST_PredSucc : forall t1,
+      nvalue t1 ->
+      (tpred (tsucc t1)) ==> t1
+  | ST_Pred : forall t1 t1',
+      t1 ==> t1' ->
+      (tpred t1) ==> (tpred t1')
+  | ST_IszeroZero :
+      (tiszero tzero) ==> ttrue
+  | ST_IszeroSucc : forall t1,
+       nvalue t1 ->
+      (tiszero (tsucc t1)) ==> tfalse
+  | ST_Iszero : forall t1 t1',
+      t1 ==> t1' ->
+      (tiszero t1) ==> (tiszero t1')
+  | ST_Funny2 : forall t1 t2 t2' t3,
+      t2 ==> t2' ->
+      (tif t1 t2 t3) ==> (tif t1 t2' t3)
+where "t1 '==>' t2" := (step t1 t2).
+
+Theorem not_step_deterministic:
+  ~(deterministic step).
+Proof.
+  unfold deterministic, not.
+  intros.
+  generalize (H (tif ttrue (tpred tzero) tfalse) (tpred tzero)
+                (tif ttrue tzero tfalse)); intro T.
+  exploit T.
+  constructor. constructor. constructor. intros. inv H0.
+Qed.
+
+Theorem progress : forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t'.
+Proof with eauto.
+  induction t; intros.
+  left...
+  left...
+  inv H.
+  generalize (IHt1 TBool H3); intro T1.
+  generalize (IHt2 T H5); intro T2.
+  generalize (IHt3 T H6); intro T3.
+  inv T1. apply bool_canonical in H...
+  inv H; right. exists t2; constructor. exists t3; constructor.
+  inv H; right. exists (tif x t2 t3); constructor...
+
+  left...
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H. right. exists (tsucc x). constructor...
+
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists (tzero). constructor...
+  exists t0; constructor...
+
+  inv H.
+  right. exists (tpred x). constructor...
+  
+  inv H.
+  generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists ttrue; constructor. exists tfalse; constructor...
+  inv H. right. exists (tiszero x); constructor...
+Qed.
+
+Theorem preservation : forall t t' T,
+  |- t \in T ->
+  t ==> t' ->
+  |- t' \in T.
+Proof with eauto.
+  intros.
+  generalize dependent T.
+  induction H0; intros; inv H...
+
+  inv H0. inv H1. assumption.
+  inv H0. inv H2. assumption.
+  inv H0. constructor.
+  inv H0. constructor.
+Qed.
+
+End variation3.
+
+
 (** **** Exercise: 2 stars, optional (variation4) *)
 (** Suppose instead that we add this rule:
       | ST_Funny3 : 
@@ -732,6 +1415,127 @@ Proof.
 
 []
 *)
+
+Module variation4.
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_IfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (tif tfalse t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+  | ST_Succ : forall t1 t1',
+      t1 ==> t1' ->
+      (tsucc t1) ==> (tsucc t1')
+  | ST_PredZero :
+      (tpred tzero) ==> tzero
+  | ST_PredSucc : forall t1,
+      nvalue t1 ->
+      (tpred (tsucc t1)) ==> t1
+  | ST_Pred : forall t1 t1',
+      t1 ==> t1' ->
+      (tpred t1) ==> (tpred t1')
+  | ST_IszeroZero :
+      (tiszero tzero) ==> ttrue
+  | ST_IszeroSucc : forall t1,
+       nvalue t1 ->
+      (tiszero (tsucc t1)) ==> tfalse
+  | ST_Iszero : forall t1 t1',
+      t1 ==> t1' ->
+      (tiszero t1) ==> (tiszero t1')
+  | ST_Funny3 : 
+      (tpred tfalse) ==> (tpred (tpred tfalse))
+where "t1 '==>' t2" := (step t1 t2).
+
+Ltac value_pre :=
+  match goal with
+    | H1: ttrue ==> _             |- _ => inv H1
+    | H1: tfalse ==> _            |- _ => inv H1
+    | H1: tzero ==> _             |- _ => inv H1
+  end.
+
+Lemma nvalue_not_succ : forall t1 t2,
+  nvalue t1 ->
+  tsucc t1 ==> t2 ->
+  False.
+Proof.
+  induction t1; intros; inv H.
+  inv H0; inv H1.
+  inv H0.
+  generalize (IHt1 t1' H2 H1); intro T. auto.
+Qed.
+
+Theorem step_deterministic :
+  deterministic step.
+Proof with eauto.
+  unfold deterministic.
+  intros.
+  generalize dependent y2.
+  induction H; intros st H2; inv H2;
+  auto; try value_pre; try find_eqn; try value_pre; auto.
+
+  generalize (nvalue_not_succ t1 t1'); intro T; exploit T... intros Tmp; inv Tmp.
+
+  generalize (nvalue_not_succ st t1'); intro T; exploit T... intros Tmp; inv Tmp.
+
+  eapply nvalue_not_succ in H; inv H...
+  eapply nvalue_not_succ in H1; inv H1...  
+Qed.
+
+Theorem progress : forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t'.
+Proof with eauto.
+  induction t; intros.
+  left...
+  left...
+  inv H...
+  generalize (IHt1 TBool H3); intro T1.
+  generalize (IHt2 T H5); intro T2.
+  generalize (IHt3 T H6); intro T3.
+  inv T1. apply bool_canonical in H...
+  inv H; right. exists t2; constructor. exists t3; constructor.
+  inv H; right. exists (tif x t2 t3); constructor...
+
+  left...
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H. right. exists (tsucc x). constructor...
+
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists (tzero). constructor...
+  exists t0; constructor...
+
+  inv H.
+  right. exists (tpred x). constructor...
+  
+  inv H.
+  generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists ttrue; constructor. exists tfalse; constructor...
+  inv H. right. exists (tiszero x); constructor...
+Qed.
+
+Theorem preservation : forall t t' T,
+  |- t \in T ->
+  t ==> t' ->
+  |- t' \in T.
+Proof with eauto.
+  intros.
+  generalize dependent T.
+  induction H0; intros; inv H...
+
+  inv H0. inv H1. assumption.
+  inv H0. inv H2. assumption.
+  inv H0. constructor.
+  inv H0. constructor.
+Qed.
+
+End variation4.
 
 (** **** Exercise: 2 stars, optional (variation5) *)
 (** Suppose instead that we add this rule:
@@ -745,6 +1549,150 @@ Proof.
 []
 *)
 
+
+Module variation5.
+
+Reserved Notation "'|-' t '\in' T" (at level 40).
+Inductive has_type : tm -> ty -> Prop :=
+  | T_True : 
+       |- ttrue \in TBool
+  | T_False : 
+       |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T,
+       |- t1 \in TBool ->
+       |- t2 \in T ->
+       |- t3 \in T ->
+       |- tif t1 t2 t3 \in T
+  | T_Zero : 
+       |- tzero \in TNat
+  | T_Succ : forall t1,
+       |- t1 \in TNat ->
+       |- tsucc t1 \in TNat
+  | T_Pred : forall t1,
+       |- t1 \in TNat ->
+       |- tpred t1 \in TNat
+  | T_Iszero : forall t1,
+       |- t1 \in TNat ->
+       |- tiszero t1 \in TBool
+  | T_Funny4 : 
+       |- tzero \in TBool
+where "'|-' t '\in' T" := (has_type t T).
+
+(* step deterministic : same *)
+
+Theorem not_progress :
+  ~(forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t').
+Proof with auto.
+  unfold not.
+  intros.
+  generalize (H ((tif tzero ttrue ttrue)) (TBool)); intro T; exploit T.
+  constructor. constructor. constructor. constructor.
+  intros.
+  inv H0.
+  inv H1. inv H0. inv H0.
+  inv H1. inv H0. inv H5.
+Qed.
+
+  
+(*
+Lemma bool_canonical : forall t,
+  |- t \in TBool -> value t -> bvalue t.
+Proof.
+  intros t HT HV.
+  inversion HV; auto.
+
+  induction H; inversion HT; auto.
+Qed.
+
+Lemma nat_canonical : forall t,
+  |- t \in TNat -> value t -> nvalue t.
+Proof.
+  intros t HT HV.
+  inversion HV.
+  inversion H; subst; inversion HT.   
+
+  auto.  
+Qed.
+
+Theorem progress : forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t'.
+Proof with eauto.
+  induction t; intros.
+  left...
+  left...
+  inv H...
+  generalize (IHt1 TBool H3); intro T1.
+  generalize (IHt2 T H5); intro T2.
+  generalize (IHt3 T H6); intro T3.
+  inv T1. apply bool_canonical in H...
+  inv H; right. exists t2; constructor. exists t3; constructor.
+  inv H; right. exists (tif x t2 t3); constructor...
+
+  left...
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H. right. exists (tsucc x). constructor...
+
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists (tzero). constructor...
+  exists t0; constructor...
+
+  inv H.
+  right. exists (tpred x). constructor...
+  
+  inv H.
+  generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists ttrue; constructor. exists tfalse; constructor...
+  inv H. right. exists (tiszero x); constructor...
+Qed.
+*)
+
+(*
+Theorem preservation :
+  ~(forall t t' T,
+  |- t \in T ->
+  t ==> t' ->
+  |- t' \in T).
+Proof with eauto.
+  unfold not. intros.
+  generalize (H (tpred (tsucc tzero)) 
+Qed.
+
+  T : ty
+  H0 : |-tpred (tsucc tzero) \in T
+  ============================
+   |-tzero \in T
+*)
+
+Theorem preservation : forall t t' T,
+  |- t \in T ->
+  t ==> t' ->
+  |- t' \in T.
+Proof with eauto.
+  intros.
+  generalize dependent T.
+  induction H0; intros; inv H...
+
+  constructor...
+  constructor. apply IHstep...
+
+  inv H0. inv H1. assumption.
+  inv H0. inv H2. assumption.
+  constructor. apply IHstep...
+  constructor.
+  inv H0. constructor.
+  inv H0. constructor.
+  constructor. apply IHstep...
+Qed.
+
+End variation5.
+
+
 (** **** Exercise: 2 stars, optional (variation6) *)
 (** Suppose instead that we add this rule:
    
@@ -756,6 +1704,161 @@ Proof.
 
 []
 *)
+
+Module variation6.
+
+Reserved Notation "'|-' t '\in' T" (at level 40).
+Inductive has_type : tm -> ty -> Prop :=
+  | T_True : 
+       |- ttrue \in TBool
+  | T_False : 
+       |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T,
+       |- t1 \in TBool ->
+       |- t2 \in T ->
+       |- t3 \in T ->
+       |- tif t1 t2 t3 \in T
+  | T_Zero : 
+       |- tzero \in TNat
+  | T_Succ : forall t1,
+       |- t1 \in TNat ->
+       |- tsucc t1 \in TNat
+  | T_Pred : forall t1,
+       |- t1 \in TNat ->
+       |- tpred t1 \in TNat
+  | T_Iszero : forall t1,
+       |- t1 \in TNat ->
+       |- tiszero t1 \in TBool
+  | T_Funny5 : 
+       |- (tpred tzero) \in TBool
+where "'|-' t '\in' T" := (has_type t T).  
+
+(* step deterministic : same *)
+
+Lemma bool_canonical : forall t,
+  |- t \in TBool -> value t -> bvalue t.
+Proof.
+  intros t HT HV.
+  inversion HV; auto.
+
+  induction H; inversion HT; auto.
+Qed.
+
+Lemma nat_canonical : forall t,
+  |- t \in TNat -> value t -> nvalue t.
+Proof.
+  intros t HT HV.
+  inversion HV.
+  inversion H; subst; inversion HT.   
+
+  auto.  
+Qed.
+
+Theorem progress : forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t'.
+Proof with eauto.
+  induction t; intros.
+  left...
+  left...
+  inv H.
+  generalize (IHt1 TBool H3); intro T1.
+  generalize (IHt2 T H5); intro T2.
+  generalize (IHt3 T H6); intro T3.
+  inv T1. apply bool_canonical in H...
+  inv H; right. exists t2; constructor. exists t3; constructor.
+  inv H; right. exists (tif x t2 t3); constructor...
+
+  left...
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H. right. exists (tsucc x). constructor...
+
+  inv H. generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists (tzero). constructor...
+  exists t0; constructor...
+
+  inv H.
+  right. exists (tpred x). constructor...
+
+(* right. eexists. constructor. *)
+  right. eexists. constructor.
+
+  right.
+  inv H.
+  generalize (IHt TNat H1); intro T.
+  inv T.
+  apply nat_canonical in H...
+  destruct H. eexists; constructor. eexists; constructor...
+
+  inv H.
+  eexists; constructor...
+  (*
+  exists (tiszero x). constructor...
+
+  
+  right.
+  eexists. constructor.
+  
+  apply IHt in H.
+  inv H. apply nat_canonical in H1.
+  apply IHt in H1. inv H1.
+  inv H. inv H0. 
+  inv H.
+  generalize (IHt TNat H1); intro T.
+  inv T. apply nat_canonical in H...
+  inv H; right. exists ttrue; constructor. exists tfalse; constructor...
+  inv H. right. exists (tiszero x); constructor...
+*)
+Qed.
+
+Theorem not_preservation :
+  ~(forall t t' T,
+  |- t \in T ->
+  t ==> t' ->
+  |- t' \in T).
+Proof with eauto.
+  unfold not; intros.
+  generalize (H (tpred tzero) tzero TBool); intro T; exploit T.
+  constructor.
+  constructor.
+  intros.
+  inv H0.
+Qed.
+
+
+(*
+Theorem not_progress :
+  ~(forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t').
+Proof with auto.
+  unfold not.
+  intros.
+  generalize (H (tpred tzero) (TBool)); intro T; exploit T.
+  constructor.
+  intros. inv H0. inv H1. inv H0. inv H0. inv H1.
+  remember x as xx.
+  inv H0. admit.
+  
+  unfold not.
+  intros.
+  generalize (H ((tif (tpred tzero) ttrue ttrue)) (TBool)); intro T; exploit T.
+  constructor. constructor. constructor. constructor.
+  intros.
+  inv H0.
+  inv H1. inv H0. inv H0.
+  inv H1. inv H0. inv H5.
+Qed.
+
+  | T_Funny5 : 
+       |- (tpred tzero) \in TBool
+*)
+
+
+End variation6.
+
 
 (** **** Exercise: 3 stars, optional (more_variations) *)
 (** Make up some exercises of your own along the same lines as
@@ -775,6 +1878,81 @@ Proof.
 (* FILL IN HERE *)
 [] *)
 
+Module remove_predzero.
+
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_IfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (tif tfalse t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+  | ST_Succ : forall t1 t1',
+      t1 ==> t1' ->
+      (tsucc t1) ==> (tsucc t1')
+(*  | ST_PredZero :
+      (tpred tzero) ==> tzero *)
+  | ST_PredSucc : forall t1,
+      nvalue t1 ->
+      (tpred (tsucc t1)) ==> t1
+  | ST_Pred : forall t1 t1',
+      t1 ==> t1' ->
+      (tpred t1) ==> (tpred t1')
+  | ST_IszeroZero :
+      (tiszero tzero) ==> ttrue
+  | ST_IszeroSucc : forall t1,
+       nvalue t1 ->
+      (tiszero (tsucc t1)) ==> tfalse
+  | ST_Iszero : forall t1 t1',
+      t1 ==> t1' ->
+      (tiszero t1) ==> (tiszero t1')
+
+where "t1 '==>' t2" := (step t1 t2).
+
+Reserved Notation "'|-' t '\in' T" (at level 40).
+
+Inductive has_type : tm -> ty -> Prop :=
+  | T_True : 
+       |- ttrue \in TBool
+  | T_False : 
+       |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T,
+       |- t1 \in TBool ->
+       |- t2 \in T ->
+       |- t3 \in T ->
+       |- tif t1 t2 t3 \in T
+  | T_Zero : 
+       |- tzero \in TNat
+  | T_Succ : forall t1,
+       |- t1 \in TNat ->
+       |- tsucc t1 \in TNat
+  | T_Pred : forall t1,
+       |- t1 \in TNat ->
+       |- tpred t1 \in TNat
+  | T_Iszero : forall t1,
+       |- t1 \in TNat ->
+       |- tiszero t1 \in TBool
+
+where "'|-' t '\in' T" := (has_type t T).
+
+Theorem not_progress :
+  ~(forall t T,
+  |- t \in T ->
+  value t \/ exists t', t ==> t').
+Proof with eauto.
+  unfold not; intros.
+  generalize (H (tpred tzero) TNat); intro T; exploit T...
+  constructor. constructor.
+  intros.
+  inv H0. inv H1. inv H0. inv H0. inv H1. inv H0. inv H2.
+Qed.
+
+End remove_predzero.
+
+
 (** **** Exercise: 4 stars, advanced (prog_pres_bigstep) *)
 (** Suppose our evaluation relation is defined in the big-step style.
     What are the appropriate analogs of the progress and preservation
@@ -783,5 +1961,8 @@ Proof.
 (* FILL IN HERE *)
 []
 *)
+
+(* progress ~= bigstep itself *)
+(* preservation ~= aexp, bexp itself *)
 
 (* $Date: 2014-04-08 23:31:16 -0400 (Tue, 08 Apr 2014) $ *)
