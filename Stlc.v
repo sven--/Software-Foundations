@@ -387,16 +387,114 @@ where "'[' x ':=' s ']' t" := (subst x s t).
 Inductive substi (s:tm) (x:id) : tm -> tm -> Prop := 
   | s_var1 : 
       substi s x (tvar x) s
-  (* FILL IN HERE *)
+  | s_var2 :
+      forall y,
+        x <> y ->
+        substi s x (tvar y) (tvar y)
+  | s_abs1 :
+      forall T body,
+        substi s x (tabs x T body) (tabs x T body)
+  | s_abs2 :
+      forall var T body body',
+        x <> var ->
+        substi s x body body' ->
+        substi s x (tabs var T body) (tabs var T body')
+(*
+  | s_abs :
+      forall var T body body',
+        substi s x body body' ->
+        substi s x (tabs var T body) (tabs var T body')
+*)
+(*
+  | tabs x' T t1 => 
+      tabs x' T (if eq_id_dec x x' then t1 else ([x:=s] t1))
+*)
+  | s_app :
+      forall t1 t1' t2 t2',
+        substi s x t1 t1' ->
+        substi s x t2 t2' ->
+        substi s x (tapp t1 t2) (tapp t1' t2')
+  | s_true :
+      substi s x ttrue ttrue
+  | s_false :
+      substi s x tfalse tfalse
+  | s_if :
+      forall t1 t1' t2 t2' t3 t3',
+        substi s x t1 t1' ->
+        substi s x t2 t2' ->
+        substi s x t3 t3' ->
+        substi s x (tif t1 t2 t3) (tif t1' t2' t3')
 .
+
+(*  
+  | s_tabs :
+      forall a T b, (tabs a T b) ->
+                    (tabs a T (substi 
+                    substi s x (tabs a T b) (tabs.
+.
+
+    tabs x' T (if eq_id_dec x x' then t1 else ([x:=s] t1))
+           
+  | tabs : id -> ty -> tm -> tm
+  match t with
+  | tvar x' => 
+      if eq_id_dec x x' then s else t
+  | tabs x' T t1 => 
+      tabs x' T (if eq_id_dec x x' then t1 else ([x:=s] t1)) 
+  | tapp t1 t2 => 
+      tapp ([x:=s] t1) ([x:=s] t2)
+  | ttrue => 
+      ttrue
+  | tfalse => 
+      tfalse
+  | tif t1 t2 t3 => 
+      tif ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
+  end
+*)
 
 Hint Constructors substi.
 
 Theorem substi_correct : forall s x t t',
   [x:=s]t = t' <-> substi s x t t'.
-Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+Proof with eauto.
+  intros.
+  generalize dependent t'.
+  generalize dependent s.
+  generalize dependent x0.
+
+  induction t; split; intros.
+  Case "tvar".
+  inv H; simpl.
+  destruct (eq_id_dec x0 i); subst; constructor...
+  inv H.
+  apply eq_id. apply neq_id...
+
+  Case "tapp".
+  inv H; simpl.
+  apply s_app. apply IHt1... apply IHt2...
+  inv H; simpl. apply IHt1 in H2; apply IHt2 in H4; subst...
+
+  Case "tabs".
+  inv H; simpl.
+  destruct (eq_id_dec x0 i); subst; constructor... apply IHt...
+
+  inv H; simpl. rewrite eq_id... rewrite neq_id... apply IHt in H5; subst...
+
+  Case "ttrue".
+  inv H; simpl. constructor.
+  inv H; simpl. constructor.
+
+  Case "tfalse".
+  inv H; simpl. constructor.
+  inv H; simpl. constructor.
+
+  Case "tif".
+  inv H; simpl. constructor.
+  apply IHt1... apply IHt2... apply IHt3...
+
+  inv H; simpl. apply IHt1 in H3. apply IHt2 in H5. apply IHt3 in H6.
+  subst...
+Qed.
 
 (* ################################### *)
 (** *** Reduction *)
@@ -483,12 +581,17 @@ i.e.
 Lemma step_example1 :
   (tapp idBB idB) ==>* idB.
 Proof.
+(*  eapply multi_step. apply ST_AppAbs. constructor. apply multi_refl. *)
   eapply multi_step.
     apply ST_AppAbs.
     apply v_abs.
   simpl.
   apply multi_refl.  Qed.  
-
+(*
+(tabs x (TArrow TBool TBool) (tvar x))
+(tabs x TBool (tvar x))
+*)
+                  
 (** Example:
 ((\x:Bool->Bool. x) ((\x:Bool->Bool. x) (\x:Bool. x))) 
       ==>* (\x:Bool. x)
@@ -499,6 +602,11 @@ i.e.
 Lemma step_example2 :
   (tapp idBB (tapp idBB idB)) ==>* idB.
 Proof.
+  (*
+  eapply multi_step. apply ST_App2. constructor. apply ST_AppAbs.  constructor.
+  eapply multi_step. apply ST_AppAbs. constructor.
+  apply multi_refl.
+*)
   eapply multi_step.
     apply ST_App2. auto.
     apply ST_AppAbs. auto.
@@ -516,7 +624,14 @@ i.e.
 
 Lemma step_example3 :
   tapp (tapp idBB notB) ttrue ==>* tfalse.
-Proof. 
+Proof.
+  (*
+  eapply multi_step. apply ST_App1. constructor. constructor.
+  eapply multi_step. apply ST_AppAbs. constructor.
+  eapply multi_step. constructor. 
+  eapply multi_refl.
+*)
+  
   eapply multi_step.
     apply ST_App1. apply ST_AppAbs. auto. simpl.
   eapply multi_step.
@@ -576,10 +691,18 @@ Lemma step_example5 :
        (tapp (tapp idBBBB idBB) idB)
   ==>* idB.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  normalize.
+Qed.
 
-(* FILL IN HERE *)
-(** [] *)
+Lemma step_example5' :
+       (tapp (tapp idBBBB idBB) idB)
+  ==>* idB.
+Proof.
+  eapply multi_step. apply ST_App1. apply ST_AppAbs. constructor.
+  eapply multi_step. apply ST_AppAbs. constructor.
+  eapply multi_refl.
+Qed.
+
 
 (* ###################################################################### *)
 (** ** Typing *)
@@ -617,7 +740,7 @@ Definition extend {A:Type} (Gamma : partial_map A) (x:id) (T : A) :=
 
 Lemma extend_eq : forall A (ctxt: partial_map A) x T,
   (extend ctxt x T) x = Some T.
-Proof.
+Proof. 
   intros. unfold extend. rewrite eq_id. auto.
 Qed.
 
@@ -743,8 +866,15 @@ Example typing_example_2_full :
           (tapp (tvar y) (tapp (tvar y) (tvar x))))) \in
     (TArrow TBool (TArrow (TArrow TBool TBool) TBool)).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  apply T_Abs.
+  apply T_Abs.
+  apply T_App with (TBool).
+  constructor. constructor.
+
+  apply T_App with (TBool).
+  constructor. constructor.
+  constructor. constructor.
+Qed.
 
 (** **** Exercise: 2 stars (typing_example_3) *)
 (** Formally prove the following typing derivation holds: *)
@@ -763,8 +893,14 @@ Example typing_example_3 :
                (tapp (tvar y) (tapp (tvar x) (tvar z)))))) \in
       T.
 Proof with auto.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  eexists.
+  repeat constructor.
+  eapply T_App.
+  apply T_Var. constructor.
+  eapply T_App.
+  apply T_Var. constructor.
+  constructor. constructor.
+Qed.
 
 (** We can also show that terms are _not_ typable.  For example, let's
     formally check that there is no typing derivation assigning a type
@@ -781,6 +917,10 @@ Example typing_nonexample_1 :
                (tapp (tvar x) (tvar y)))) \in
         T.
 Proof.
+  (*
+  unfold not; intros.
+  inv H. inv H0. inv H5. inv H4. inv H2. inv H1.
+*)
   intros Hc. inversion Hc.
   (* The [clear] tactic is useful here for tidying away bits of
      the context that we're not going to need again. *)
@@ -798,6 +938,53 @@ Proof.
           empty |- \x:S. x x : T).
 *)
 
+Lemma type_neq : forall A B,
+                   ~((TArrow A B) = A).
+Proof.
+  (*
+  unfold not; intros.
+  remember (TArrow A B) as C.
+  generalize dependent A.
+  generalize dependent B.
+  induction C; intros. inv H. inv HeqC.
+  inv H.
+  
+  unfold not; intros.
+
+  generalize dependent B.
+  induction A; intros. inv H.
+  *)
+  Abort.
+
+(* Inductive ty : Type :=  TBool : ty | TArrow : ty -> ty -> ty *)
+
+Lemma type_some_neq : forall A B,
+                        ~(Some (TArrow A B) = Some (A)).
+Proof.
+  unfold not.
+  intros.
+  induction (TArrow A B) eqn:eq. inv H. inv eq.
+  inv eq. 
+(*  destruct (Some (TArrow A B)) eqn:eq. *)
+
+(*  
+  intros. induction (TArrow A B) eqn:eq.
+  inv H. inv eq.
+  inv H. 
+*)
+  (*
+  intros; generalize dependent A; induction B; intros.
+  admit.
+  replace (TArrow A (TArrow B1 B2)) with (TArrow (TArrow A B1) B2) in H.
+
+
+  induction A; intros.
+  inv H.
+  destruct (TArrow A1 A2) eqn:eq.
+  inv H. inv eq.
+*)
+Abort.
+
 Example typing_nonexample_3 :
   ~ (exists S, exists T,
         empty |- 
@@ -805,12 +992,85 @@ Example typing_nonexample_3 :
              (tapp (tvar x) (tvar x))) \in
           T).
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
 
+(*
+  intros [S [T HT]].
+  inversion HT; subst; clear HT.
+  inversion H4; subst; clear H4.
+  inversion H2; subst; clear H2.
+  inversion H5; subst; clear H5.
+  rewrite H1 in H2; clear H1.
+  inversion H2; clear H2.
+  induction T11.
+    inversion H0.
+    inversion H0. apply IHT11_1. rewrite H2. assumption.
+*)
+
+(*
+  T12 : ty
+  T11 : ty
+  H2 : extend \empty x (TArrow T11 T12) x = Some T11
+  ============================
+   False
+*)  
+  (*
+  inv H4.
+  rewrite extend_eq in H1. inv H1.
+  inv H2. 
+*)
+  unfold not; intros.
+  inv H. inv H0. inv H. inv H5.  
+  inv H2. inv H1. inv H4. rewrite extend_eq in H1. subst.
+  (** INV FAILS, WHILE INVERSION WORKS!!!!!!!!!!!!!
+https://github.com/sven--/Software-Foundations/issues/23
+**)
+  inversion H1. clear H1.
+  induction T11. inversion H0. inversion H0; clear H0.
+  subst T12.
+  auto.
+
+  (*
+  rename T11 into A. rename T12 into B.
+
+  
+
+  generalize dependent A.
+  induction B; intros.
+
+  generalize dependent B.
+  induction A; intros. inv H1.
+  generalize (IHA1 A2); intro T.
+  generalize (IHA2 A2); intro T2.
+
+  destruct B eqn:eq.
+
+  destruct (TArrow A1 A2) eqn:eq.
+
+  
+  destruct (Some (TArrow A1 A2)) eqn:eq.
+
+  
+Inductive option (A : Type) : Type :=  Some : A -> option A | None : option A
+
+
+  auto.
+  generalize dependent T12.
+  induction T11; intros. inv H1.
+  
+  
+  remember (TArrow T11 T12) as T2.
+  destruct T2. inv HeqT2.
+*)
+
+(*  unfold extend in H1. simpl in H1. *)
+(* Inductive ty : Type :=  TBool : ty | TArrow : ty -> ty -> ty *)
+
+Qed.
+  
 
 
 End STLC.
 
+   
 (* $Date: 2013-11-20 13:03:49 -0500 (Wed, 20 Nov 2013) $ *)
 
