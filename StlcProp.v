@@ -87,7 +87,8 @@ Theorem progress : forall t T,
 
 Proof with eauto.
   intros t T Ht.
-  remember (@empty ty) as Gamma.
+  remember (empty) as Gamma.
+(*  remember (@empty ty) as Gamma. *)
   has_type_cases (induction Ht) Case; subst Gamma...
   Case "T_Var".
     (* contradictory: variables cannot be typed in an 
@@ -129,10 +130,37 @@ Qed.
 Theorem progress' : forall t T,
      empty |- t \in T ->
      value t \/ exists t', t ==> t'.
-Proof.
+Proof with eauto.
   intros t.
   t_cases (induction t) Case; intros T Ht; auto.
-  (* FILL IN HERE *) Admitted.
+
+  inv Ht. inversion H1.
+  inv Ht.
+  generalize H2; intro H1.
+  generalize H4; intro H3.
+  apply IHt1 in H2.
+  apply IHt2 in H4.
+  right.
+  inv H4. inv H2.
+  inv H1; inv H0.
+  eexists. (*using it to early, right after right, will make next line not work *)
+  apply ST_AppAbs...
+  inv H0. eexists. apply ST_App1...
+  inv H2. inv H. eexists. apply ST_App2...
+  inv H. inv H0. eexists. apply ST_App1...
+
+  inv Ht.
+  generalize H3; intro T1.
+  generalize H5; intro T2.
+  generalize H6; intro T3.  
+  apply IHt1 in H3.
+  apply IHt2 in H5.
+  apply IHt3 in H6.
+  right.
+  inv H3. inv H. inv T1. eexists; constructor. eexists; constructor.
+  inv H. eexists; constructor...
+Qed.
+                                 
 (** [] *)
 
 (* ###################################################################### *)
@@ -281,8 +309,11 @@ Corollary typable_empty__closed : forall t T,
     empty |- t \in T  ->
     closed t.
 Proof.
-  (* FILL IN HERE *) Admitted.
-(** [] *)
+  unfold closed, not.
+  intros.
+  apply free_in_context with (Gamma:=empty) (T:=T) in H0.
+  inv H0. inv H1. assumption.
+Qed.
 
 (** Sometimes, when we have a proof [Gamma |- t : T], we will need to
     replace [Gamma] by a different context [Gamma'].  When is it safe
@@ -575,7 +606,76 @@ Proof.
   intros t t' T Hhas_type Hmulti. unfold stuck.
   intros [Hnf Hnot_val]. unfold normal_form in Hnf.
   induction Hmulti.
-  (* FILL IN HERE *) Admitted.
+
+
+  unfold not in Hnf.
+  unfold not in Hnot_val.
+  apply progress in Hhas_type.
+  inv Hhas_type. apply Hnot_val in H. inv H.
+  apply Hnf in H. inv H.
+
+  generalize (preservation x0 y0 T Hhas_type H); intro.
+  apply IHHmulti in H0. inv H0.
+  assumption.
+  assumption.
+  (*
+  unfold not in Hnf.
+  generalize (progress x0 T Hhas_type); intro.
+  inv H0.
+  inv H.
+  inv Hhas_type.
+  *)
+(*  
+  destruct T.
+  apply canonical_forms_bool in Hhas_type.
+  inv Hhas_type.
+  apply Hnot_val. auto.
+  apply Hnot_val. auto.
+
+  
+  destruct x0 eqn:eq.
+  inv Hhas_type. inv H1.
+  inv Hhas_type.
+  apply Hnf. eexists. constructor. 
+*)  
+Qed.
+
+(*
+Lemma canonical_forms_fun : forall t T1 T2,
+  empty |- t \in (TArrow T1 T2) ->
+  value t ->
+  exists x u, t = tabs x T1 u.
+  
+Theorem progress : forall t T, 
+     empty |- t \in T ->
+     value t \/ exists t', t ==> t'.
+  
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+  
+Corollary typable_empty__closed : forall t T, 
+    empty |- t \in T  ->
+    closed t.
+
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+  
+Lemma substitution_preserves_typing : forall Gamma x U t v T,
+     extend Gamma x U |- t \in T ->
+     empty |- v \in U   ->
+     Gamma |- [x:=v]t \in T.
+  
+Theorem preservation : forall t t' T,
+     empty |- t \in T  ->
+     t ==> t'  ->
+     empty |- t' \in T.
+*)
+
+
 
 (* ###################################################################### *)
 (** * Uniqueness of Types *)
@@ -586,16 +686,199 @@ Proof.
     type. *)
 (** Formalize this statement and prove it. *)
 
-(* FILL IN HERE *)
-(** [] *)
+Lemma neq_type_arrow : forall Ta Tb Tc,
+                         TArrow Ta Tb <> TArrow Ta Tc ->
+                         Tb <> Tc.
+Proof with eauto.
+  intros.
+  unfold not.
+  intro.
+  subst.
+  contradiction H.
+  reflexivity.
+Qed.
 
+(*
+Lemma lem : forall Gamma i t t' T,
+              extend Gamma i t |- t' \in T ->
+              Gamma |- t' \in T -> False.
+*)
+
+Theorem types_unique : forall Gamma t T T',
+  T <> T' ->
+  Gamma |- t \in T ->
+  Gamma |- t \in T' ->
+  False.
+Proof with auto.
+  (*
+  intros.
+  generalize dependent T'.
+  induction H0; intros.
+
+  inv H1. rewrite H in H4. inversion H4. auto.
+
+  inv H1. unfold not in H. apply neq_type_arrow in H. apply (IHhas_type T1 H H7).
+
+  inv H1.
+
+  inv H1. inv H4; inv H0_.
+  rewrite H0 in H3. inversion H3...
+
+
+  eapply IHhas_type.
+*)
+
+
+  intros Gamma t.
+  induction t; intros; inv H0; inv H1.
+
+  rewrite H4 in H3. inversion H3...
+
+  generalize (IHt1 (TArrow T11 T) (TArrow T0 T')); intro H9;
+  exploit H9... unfold not; intros; inversion H0; auto.
+
+  apply neq_type_arrow in H.
+  admit.
+
+
+(*  
+  apply IHt in H...
+  destruct t0; inv H7; inv H6. rewrite H2 in H3. inversion H3. contradiction H.
+  
+  inv H7; inv H6.
+  rewrite H0 in H3. inversion H3. contradiction H.
+*)  
+  
+
+  auto. auto.
+
+  eapply IHt2. eauto. auto. auto.
+
+(*
+
+  generalize (substitution_preserves_typing Gamma i t t0 (tvar i) T12); intro T.
+  exploit T... 
+  apply substitution_preserves_typing with (v:=t0) in H7.
+
+
+
+
+
+  apply IHt in H... 
+  
+  apply IHt1 with (T:=(TArrow T11 T)) in H5. inv H5. 
+  
+  intros.
+  generalize dependent T'.
+  induction H0; intros.
+  
+     : forall (Gamma : partial_map ty) (x : id) (U : ty) (t v : tm) (T : ty),
+       extend Gamma x U |- t \in T ->
+       \empty |- v \in U -> Gamma |- [x := v]t \in T
+                                                     
+Lemma substitution_preserves_typing : forall Gamma x U t v T,
+     extend Gamma x U |- t \in T ->
+     empty |- v \in U   ->
+     Gamma |- [x:=v]t \in T.
+  
+T_Abs:
+  forall (Gamma : partial_map ty) (x : id) (T11 T12 : ty) (t12 : tm),
+  extend Gamma x T11 |- t12 \in T12 ->
+  Gamma |- tabs x T11 t12 \in TArrow T11 T12
+*)
+Qed.
+
+(* ####################
+peeked
+https://github.com/panx/SF/blob/master/StlcProp.v
+I don't see why only this method works...
+########!!!!!!!!!!!!!!!!!! ***********)
+
+Theorem types_unique' : forall Gamma t T,
+  Gamma |- t \in T ->
+  forall T', Gamma |- t \in T' ->
+  T = T'.
+Proof with eauto.
+  intros.
+  generalize dependent T'.
+  induction H; intros...; inv H0.
+  inv H0. rewrite H in H3. inversion H3...
+  inv H0. apply IHhas_type in H6. subst...
+  inv H1. apply IHhas_type1 in H5. inversion H5...
+  inv H0...
+  inv H0...
+  inv H2. apply IHhas_type2 in H9...
+
+(*  
+  intros.
+  generalize dependent T'.
+  induction H; intros.
+  inv H0. admit.
+  apply IHhas_type in H. 
+  
+  induction t; intros;
+  inv H; inv H0.
+  admit.
+  apply IHt1 with (T:=TArrow T0 T') in H4... inversion H4...
+*)
+Qed.
+  
+
+Theorem types_unique'' : forall Gamma t T,
+  Gamma |- t \in T ->
+  forall T', Gamma |- t \in T' ->
+  T = T'.
+Proof with eauto. 
+  intros Gamma t. generalize dependent Gamma.
+  induction t; intros; inv H; inv H0...
+  rewrite H3 in H2. inversion H2...
+
+  generalize (IHt1 Gamma (TArrow T11 T) H4 (TArrow T0 T') H3); intro. inversion H...
+
+  generalize (IHt (extend Gamma i t) T12 H6 T0 H5); intro. inversion H...
+Qed.
+
+Theorem types_unique''' : forall Gamma t T T',
+  T <> T' ->
+  Gamma |- t \in T ->
+  Gamma |- t \in T' ->
+  False.
+Proof with eauto.
+(*  intros. apply (types_unique'' Gamma t T') in H0. auto. auto. *)
+  intros Gamma t. generalize dependent Gamma.
+  induction t; intros; inv H0; inv H1...
+  rewrite H4 in H3. inversion H3...
+  generalize (IHt1 Gamma (TArrow T11 T) (TArrow T0 T')); intro G; exploit G...
+  unfold not; intro. inversion H0. rewrite H3 in H...
+
+  generalize (IHt (extend Gamma i t) T12 T0); intro G; exploit G...
+  unfold not; intros. rewrite H0 in H...
+Qed.
+
+
+                            
 (* ###################################################################### *)
 (** * Additional Exercises *)
 
 (** **** Exercise: 1 star (progress_preservation_statement) *)
 (** Without peeking, write down the progress and preservation
     theorems for the simply typed lambda-calculus. *)
-(** [] *)
+
+(*
+progress : if some "tm" "has_type", then it is "value" or "step"s to another "tm".
+preservation : if some "tm" has "step"ed to another "tm", the latter one has same "ty" with former one.
+
+*)
+(*
+Ans :
+     : forall (t : tm) (T : ty),
+       \empty |- t \in T -> value t \/ (exists t' : tm, t ==> t')
+
+     : forall (t t' : tm) (T : ty),
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T
+*)
+(* above theorems were defiend in only "empty" gamma? *)
+
 
 
 (** **** Exercise: 2 stars (stlc_variation1) *)
@@ -615,9 +898,349 @@ and the following typing rule:
       - Progress
 
       - Preservation
-
-[]
 *)
+
+Module stlc_variation1.
+
+Inductive tm : Type :=
+    tvar : id -> tm
+  | tapp : tm -> tm -> tm
+  | tabs : id -> ty -> tm -> tm
+  | ttrue : tm
+  | tfalse : tm
+  | tif : tm -> tm -> tm -> tm
+  | zap : tm.
+
+Reserved Notation "'[' x ':=' s ']' t" (at level 20).
+
+Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
+  match t with
+  | tvar x' => 
+      if eq_id_dec x x' then s else t
+  | tabs x' T t1 => 
+      tabs x' T (if eq_id_dec x x' then t1 else ([x:=s] t1)) 
+  | tapp t1 t2 => 
+      tapp ([x:=s] t1) ([x:=s] t2)
+  | ttrue => 
+      ttrue
+  | tfalse => 
+      tfalse
+  | tif t1 t2 t3 => 
+      tif ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
+  | zap => zap
+  end
+
+where "'[' x ':=' s ']' t" := (subst x s t).
+
+Inductive value : tm -> Prop :=
+  | v_abs : forall x T t,
+      value (tabs x T t)
+  | v_true : 
+      value ttrue
+  | v_false : 
+      value tfalse.
+
+Hint Constructors value.
+
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_AppAbs : forall x T t12 v2,
+         value v2 ->
+         (tapp (tabs x T t12) v2) ==> [x:=v2]t12
+  | ST_App1 : forall t1 t1' t2,
+         t1 ==> t1' ->
+         tapp t1 t2 ==> tapp t1' t2
+  | ST_App2 : forall v1 t2 t2',
+         value v1 ->
+         t2 ==> t2' -> 
+         tapp v1 t2 ==> tapp v1  t2'
+  | ST_IfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (tif tfalse t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+  | ST_Zap : forall t,
+      t ==> zap
+where "t1 '==>' t2" := (step t1 t2).
+
+Tactic Notation "step_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "ST_AppAbs" | Case_aux c "ST_App1" 
+  | Case_aux c "ST_App2" | Case_aux c "ST_IfTrue" 
+  | Case_aux c "ST_IfFalse" | Case_aux c "ST_If" ].
+
+Hint Constructors step.
+
+Notation multistep := (multi step).
+Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+    
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- tvar x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      extend Gamma x T11 |- t12 \in T12 -> 
+      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 -> 
+      Gamma |- t2 \in T11 -> 
+      Gamma |- tapp t1 t2 \in T12
+  | T_True : forall Gamma,
+       Gamma |- ttrue \in TBool
+  | T_False : forall Gamma,
+       Gamma |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TBool ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- tif t1 t2 t3 \in T
+  | T_Zap : forall Gamma T,
+       Gamma |- zap \in T
+
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+Tactic Notation "has_type_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "T_Var" | Case_aux c "T_Abs" 
+  | Case_aux c "T_App" | Case_aux c "T_True" 
+  | Case_aux c "T_False" | Case_aux c "T_If" ].
+
+Hint Constructors has_type.
+
+Theorem not_step_deterministic:
+  ~(deterministic step).
+Proof with eauto.
+  unfold deterministic, not; intro.
+  generalize (H (tif ttrue tfalse tfalse) tfalse zap); intro T; exploit T...
+  intro. inv H0.
+Qed.
+
+Theorem progress :
+  forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t').
+Proof with eauto.
+  induction t; intros...
+Qed.
+
+Inductive appears_free_in : id -> tm -> Prop :=
+  | afi_var : forall x,
+      appears_free_in x (tvar x)
+  | afi_app1 : forall x t1 t2,
+      appears_free_in x t1 -> appears_free_in x (tapp t1 t2)
+  | afi_app2 : forall x t1 t2,
+      appears_free_in x t2 -> appears_free_in x (tapp t1 t2)
+  | afi_abs : forall x y T11 t12,
+      y <> x  ->
+      appears_free_in x t12 ->
+      appears_free_in x (tabs y T11 t12)
+  | afi_if1 : forall x t1 t2 t3,
+      appears_free_in x t1 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if2 : forall x t1 t2 t3,
+      appears_free_in x t2 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if3 : forall x t1 t2 t3,
+      appears_free_in x t3 ->
+      appears_free_in x (tif t1 t2 t3).
+
+Hint Constructors appears_free_in.
+
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+Proof with eauto.
+  intros. 
+  generalize dependent Gamma'.
+  induction H; intros; auto.
+(*  has_type_cases (induction H) Case; intros; auto. *)
+  Case "T_Var".
+    apply T_Var. rewrite <- H0...
+  Case "T_Abs".
+    apply T_Abs.
+    apply IHhas_type. intros x1 Hafi.
+    (* the only tricky step... the [Gamma'] we use to 
+       instantiate is [extend Gamma x T11] *)
+    unfold extend. destruct (eq_id_dec x0 x1)... 
+  Case "T_App".
+    apply T_App with T11...  
+Qed.
+
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+Proof.
+  intros x t T Gamma H H0. generalize dependent Gamma. 
+  generalize dependent T. 
+  afi_cases (induction H) Case; 
+         intros; try solve [inversion H0; eauto].
+  Case "afi_abs".
+    inversion H1; subst.
+    apply IHappears_free_in in H7.
+    rewrite extend_neq in H7; assumption.
+Qed.
+
+Theorem substitution_preserves_typing : forall Gamma x U t v T,
+       extend Gamma x U |- t \in T ->
+       \empty |- v \in U -> Gamma |- [x := v]t \in T.
+Proof with eauto.
+  intros Gamma x U t v T Ht Ht'.
+  generalize dependent Gamma. generalize dependent T.
+  induction t; intros T Gamma H;
+(*  t_cases (induction t) Case; intros T Gamma H; *)
+    (* in each case, we'll want to get at the derivation of H *)
+    inversion H; subst; simpl...
+  Case "tvar".
+    rename i into y. destruct (eq_id_dec x y).
+    SCase "x=y".
+      subst. 
+      rewrite extend_eq in H2.
+      inversion H2; subst. clear H2.
+                  eapply context_invariance... intros x Hcontra.
+      destruct (free_in_context _ _ T empty Hcontra) as [T' HT']...
+      inversion HT'.
+    SCase "x<>y".
+      apply T_Var. rewrite extend_neq in H2... 
+  Case "tabs".
+    rename i into y. apply T_Abs.
+    destruct (eq_id_dec x y).
+    SCase "x=y".
+      eapply context_invariance...
+      subst.
+      intros x Hafi. unfold extend.
+      destruct (eq_id_dec y x)...
+    SCase "x<>y".
+      apply IHt. eapply context_invariance...
+      intros z Hafi. unfold extend.
+      destruct (eq_id_dec y z)...
+      subst. rewrite neq_id...   
+Qed.
+
+Theorem preservation : forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T.
+Proof with eauto.
+(*******!!!!!!!##################
+            HERE, (remember (empty) as Gamma.) acts as crucial key...
+WHY?????????????
+*)
+  intros. generalize dependent t'.
+  remember (empty) as Gamma.  
+(*  remember (@empty ty) as Gamma. *)
+  induction H; intros; (* inv H0...; *)
+  subst Gamma; subst; 
+(*  inv HeqGamma; *)
+  try solve [inv H0].
+  inv H0...
+  inv H0...
+
+  inv H1; subst...
+(*  
+     : forall (Gamma : partial_map ty) (x : id) (U : ty) 
+         (t v : STLC.tm) (T : ty),
+       extend Gamma x U |- t \in T ->
+       \empty |- v \in U -> Gamma |- [x := v]t \in T
+*)
+  eapply substitution_preserves_typing... inv H...
+  inv H0...
+  inv H0...
+  inv H2...
+  inv H0...
+
+(*  
+  intros. generalize dependent t'.
+  induction H; intros...; (* inv H0...; *)
+  try solve [inv H0...].
+  inv H0...
+  inv H0...
+
+  admit.
+  inv H0...
+  inv H0...
+  inv H2...
+  inv H0...
+*)
+Qed.
+(*
+  remember (@empty ty) as Gamma. 
+  intros t t' T HT. generalize dependent t'.   
+  has_type_cases (induction HT) Case;
+       intros t' HE; subst Gamma; subst; 
+       try solve [inversion HE; subst; auto].
+  Case "T_App".
+    inversion HE; subst...
+    (* Most of the cases are immediate by induction, 
+       and [eauto] takes care of them *)
+    SCase "ST_AppAbs".
+      apply substitution_preserves_typing with T11...
+      inversion HT1...
+*)
+(*
+Theorem not_preservation :
+  ~(forall t t' T,
+   \empty |- t \in T -> t ==> t' -> \empty |- t' \in T).
+Proof with eauto.
+  unfold not; intro.
+  generalize (H (tapp (tabs x TBool (tvar x)) ttrue) (*[x := ttrue](tvar x)*)
+                zap
+(*                (subst x ttrue (tvar x)) *)
+                TBool
+             );
+  intro T; exploit T.
+  eapply T_App...
+  constructor...
+  intro.
+  inv H0.
+    
+  apply T_App with (T11:=TBool).
+  constructor. constructor. rewrite extend_eq. 
+
+
+  generalize (H (tapp (tif ttrue tfalse tfalse) ttrue) (tapp tfalse ttrue)
+             );
+  intro T; exploit T.
+
+  intro. inv H0.
+Qed.
+  | T_Abs : forall (Gamma : partial_map ty) (x : id) 
+              (T11 T12 : ty) (t12 : tm),
+            extend Gamma x T11 |- t12 \in T12 ->
+            Gamma |- tabs x T11 t12 \in TArrow T11 T12
+                value v2 -> tapp (tabs x T t12) v2 ==> [x := v2]t12
+*)
+
+Definition stuck (t:tm) : Prop :=
+  (normal_form step) t /\ ~ value t.
+
+Corollary soundness : forall t t' T,
+  empty |- t \in T -> 
+  t ==>* t' ->
+  ~(stuck t').
+Proof.
+  intros t t' T Hhas_type Hmulti. unfold stuck.
+  intros [Hnf Hnot_val]. unfold normal_form in Hnf.
+  induction Hmulti.
+
+
+  unfold not in Hnf.
+  unfold not in Hnot_val.
+  apply progress in Hhas_type.
+  inv Hhas_type. apply Hnot_val in H. inv H.
+  apply Hnf in H. inv H.
+
+  generalize (preservation x0 y0 T Hhas_type H); intro.
+  apply IHHmulti in H0. inv H0.
+  assumption.
+  assumption.
+Qed.
+
+End stlc_variation1.
 
 (** **** Exercise: 2 stars (stlc_variation2) *)
 (** Suppose instead that we add a new term [foo] with the following reduction rules:
@@ -640,6 +1263,188 @@ and the following typing rule:
 []
 *)
 
+Module stlc_variation2.
+
+Inductive tm : Type :=
+    tvar : id -> tm
+  | tapp : tm -> tm -> tm
+  | tabs : id -> ty -> tm -> tm
+  | ttrue : tm
+  | tfalse : tm
+  | tif : tm -> tm -> tm -> tm
+  | foo : tm.
+
+Reserved Notation "'[' x ':=' s ']' t" (at level 20).
+
+Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
+  match t with
+  | tvar x' => 
+      if eq_id_dec x x' then s else t
+  | tabs x' T t1 => 
+      tabs x' T (if eq_id_dec x x' then t1 else ([x:=s] t1)) 
+  | tapp t1 t2 => 
+      tapp ([x:=s] t1) ([x:=s] t2)
+  | ttrue => 
+      ttrue
+  | tfalse => 
+      tfalse
+  | tif t1 t2 t3 => 
+      tif ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
+  | zap => zap
+  end
+
+where "'[' x ':=' s ']' t" := (subst x s t).
+
+Inductive value : tm -> Prop :=
+  | v_abs : forall x T t,
+      value (tabs x T t)
+  | v_true : 
+      value ttrue
+  | v_false : 
+      value tfalse.
+
+Hint Constructors value.
+
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_AppAbs : forall x T t12 v2,
+         value v2 ->
+         (tapp (tabs x T t12) v2) ==> [x:=v2]t12
+  | ST_App1 : forall t1 t1' t2,
+         t1 ==> t1' ->
+         tapp t1 t2 ==> tapp t1' t2
+  | ST_App2 : forall v1 t2 t2',
+         value v1 ->
+         t2 ==> t2' -> 
+         tapp v1 t2 ==> tapp v1  t2'
+  | ST_IfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (tif tfalse t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+  | ST_Foo1 : forall x A,
+      (tabs x A (tvar x)) ==> foo
+  | ST_Foo2 :
+      foo ==> ttrue
+
+where "t1 '==>' t2" := (step t1 t2).
+(*
+                       -----------------                (ST_Foo1)
+                       (\x:A. x) ==> foo 
+
+                         ------------                   (ST_Foo2)
+                         foo ==> true
+*)
+                         
+Tactic Notation "step_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "ST_AppAbs" | Case_aux c "ST_App1" 
+  | Case_aux c "ST_App2" | Case_aux c "ST_IfTrue" 
+  | Case_aux c "ST_IfFalse" | Case_aux c "ST_If" ].
+
+Hint Constructors step.
+
+Notation multistep := (multi step).
+Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+    
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- tvar x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      extend Gamma x T11 |- t12 \in T12 -> 
+      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 -> 
+      Gamma |- t2 \in T11 -> 
+      Gamma |- tapp t1 t2 \in T12
+  | T_True : forall Gamma,
+       Gamma |- ttrue \in TBool
+  | T_False : forall Gamma,
+       Gamma |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TBool ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- tif t1 t2 t3 \in T
+
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+Tactic Notation "has_type_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "T_Var" | Case_aux c "T_Abs" 
+  | Case_aux c "T_App" | Case_aux c "T_True" 
+  | Case_aux c "T_False" | Case_aux c "T_If" ].
+
+Hint Constructors has_type.
+
+Theorem not_step_deterministic:
+  ~(deterministic step).
+Proof with eauto.
+  unfold deterministic, not; intro.
+  generalize (H (tapp (tabs x TBool (tvar x)) ttrue) (subst x ttrue (tvar x))); intro T; exploit T...
+  intro. inv H0.
+Qed.
+
+Lemma canonical_forms_bool : forall t,
+  empty |- t \in TBool ->
+  value t ->
+  (t = ttrue) \/ (t = tfalse).
+Proof.
+  intros t HT HVal.
+  inversion HVal; intros; subst; try inversion HT; auto.
+Qed.
+
+Theorem progress :
+  forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t').
+Proof with eauto.
+  induction t; intros; inv H...
+  inv H2.
+  generalize H3; intro.
+  generalize H5; intro.
+  apply IHt1 in H3.
+  apply IHt2 in H5.
+  right.
+  inv H3; inv H5.
+  inv H0; inv H...
+  inv H2. eexists...
+  inv H. eexists...
+  inv H. eexists...
+
+  right.
+  generalize H4; intro.
+  generalize H6; intro.
+  generalize H7; intro.
+  apply IHt1 in H4.
+  apply IHt2 in H6.
+  apply IHt3 in H7.
+  inv H4.
+  apply canonical_forms_bool in H...
+  inv H; eexists...
+  inv H; eexists...
+Qed. 
+
+
+Theorem not_preservation : ~(forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T).
+Proof with eauto.
+  unfold not; intro.
+  generalize (H (tabs x TBool (tvar x)) foo); intro T; exploit T.
+  repeat constructor... 
+  constructor.
+  intro.
+  inv H0.
+Qed.  
+
+End stlc_variation2.
+
 (** **** Exercise: 2 stars (stlc_variation3) *)
 (** Suppose instead that we remove the rule [ST_App1] from the [step]
     relation. Which of the following properties of the STLC remain
@@ -655,6 +1460,203 @@ and the following typing rule:
 
 []
 *)
+
+Module stlc_variation3.
+
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_AppAbs : forall x T t12 v2,
+         value v2 ->
+         (tapp (tabs x T t12) v2) ==> [x:=v2]t12
+  | ST_App2 : forall v1 t2 t2',
+         value v1 ->
+         t2 ==> t2' -> 
+         tapp v1 t2 ==> tapp v1  t2'
+  | ST_IfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (tif tfalse t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+
+where "t1 '==>' t2" := (step t1 t2).
+
+Hint Constructors step.
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+    
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- tvar x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      extend Gamma x T11 |- t12 \in T12 -> 
+      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 -> 
+      Gamma |- t2 \in T11 -> 
+      Gamma |- tapp t1 t2 \in T12
+  | T_True : forall Gamma,
+       Gamma |- ttrue \in TBool
+  | T_False : forall Gamma,
+       Gamma |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TBool ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- tif t1 t2 t3 \in T
+
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+Hint Constructors has_type.
+
+Theorem step_deterministic :
+  deterministic step.
+Proof with auto.
+  unfold deterministic.
+  intros.
+  generalize dependent y2.
+  induction H; intros...; inv H0...
+
+  inv H0. auto. inv H3. inv H... inv H5... inv H5. inv H5.
+
+  inv H1... inv H... inv H5...
+  inv H0... inv H0. inv H0. apply IHstep in H6. subst...
+
+  inv H0... inv H4.
+  inv H0... inv H4.
+  inv H0... inv H. inv H. apply IHstep in H5. subst...
+Qed.
+
+Theorem not_progress :
+  ~(forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t')).
+Proof with eauto.
+  unfold not; intros.
+  generalize (H (tapp (tif ttrue (tabs x TBool (tvar x))
+                                 (tabs x TBool (tvar x)))
+                           ttrue) TBool); intro T; exploit T...
+  eapply T_App... constructor...
+  intro. inv H0. inv H1. inv H1. inv H0. inv H5.
+Qed.
+
+
+Inductive appears_free_in : id -> tm -> Prop :=
+  | afi_var : forall x,
+      appears_free_in x (tvar x)
+  | afi_app1 : forall x t1 t2,
+      appears_free_in x t1 -> appears_free_in x (tapp t1 t2)
+  | afi_app2 : forall x t1 t2,
+      appears_free_in x t2 -> appears_free_in x (tapp t1 t2)
+  | afi_abs : forall x y T11 t12,
+      y <> x  ->
+      appears_free_in x t12 ->
+      appears_free_in x (tabs y T11 t12)
+  | afi_if1 : forall x t1 t2 t3,
+      appears_free_in x t1 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if2 : forall x t1 t2 t3,
+      appears_free_in x t2 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if3 : forall x t1 t2 t3,
+      appears_free_in x t3 ->
+      appears_free_in x (tif t1 t2 t3).
+
+Hint Constructors appears_free_in.
+
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+Proof with eauto.
+  intros. 
+  generalize dependent Gamma'.
+  induction H; intros; auto.
+(*  has_type_cases (induction H) Case; intros; auto. *)
+  Case "T_Var".
+    apply T_Var. rewrite <- H0...
+  Case "T_Abs".
+    apply T_Abs.
+    apply IHhas_type. intros x1 Hafi.
+    (* the only tricky step... the [Gamma'] we use to 
+       instantiate is [extend Gamma x T11] *)
+    unfold extend. destruct (eq_id_dec x0 x1)... 
+  Case "T_App".
+    apply T_App with T11...  
+Qed.
+
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+Proof.
+  intros x t T Gamma H H0. generalize dependent Gamma. 
+  generalize dependent T. 
+  afi_cases (induction H) Case; 
+         intros; try solve [inversion H0; eauto].
+  Case "afi_abs".
+    inversion H1; subst.
+    apply IHappears_free_in in H7.
+    rewrite extend_neq in H7; assumption.
+Qed.
+
+Theorem substitution_preserves_typing : forall Gamma x U t v T,
+       extend Gamma x U |- t \in T ->
+       \empty |- v \in U -> Gamma |- [x := v]t \in T.
+Proof with eauto.
+  intros Gamma x U t v T Ht Ht'.
+  generalize dependent Gamma. generalize dependent T.
+  induction t; intros T Gamma H;
+(*  t_cases (induction t) Case; intros T Gamma H; *)
+    (* in each case, we'll want to get at the derivation of H *)
+    inversion H; subst; simpl...
+  Case "tvar".
+    rename i into y. destruct (eq_id_dec x y).
+    SCase "x=y".
+      subst. 
+      rewrite extend_eq in H2.
+      inversion H2; subst. clear H2.
+                  eapply context_invariance... intros x Hcontra.
+      destruct (free_in_context _ _ T empty Hcontra) as [T' HT']...
+      inversion HT'.
+    SCase "x<>y".
+      apply T_Var. rewrite extend_neq in H2... 
+  Case "tabs".
+    rename i into y. apply T_Abs.
+    destruct (eq_id_dec x y).
+    SCase "x=y".
+      eapply context_invariance...
+      subst.
+      intros x Hafi. unfold extend.
+      destruct (eq_id_dec y x)...
+    SCase "x<>y".
+      apply IHt. eapply context_invariance...
+      intros z Hafi. unfold extend.
+      destruct (eq_id_dec y z)...
+      subst. rewrite neq_id...   
+Qed.
+
+Theorem preservation : forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T.
+Proof with eauto.
+  intros. generalize dependent t'.
+  remember (empty) as Gamma.  
+(*  remember (@empty ty) as Gamma. *)
+  induction H; intros; (* inv H0...; *)
+  subst Gamma; subst; 
+(*  inv HeqGamma; *)
+  try solve [inv H0].
+  inv H1...
+  eapply substitution_preserves_typing... inv H...
+  inv H2...
+Qed.
+
+End stlc_variation3.
+
+
 
 (** **** Exercise: 2 stars, optional (stlc_variation4) *)
 (** Suppose instead that we add the following new rule to the reduction relation:
@@ -672,6 +1674,126 @@ and the following typing rule:
       - Preservation
 
 *)
+
+Module stlc_variation4.
+
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_AppAbs : forall x T t12 v2,
+         value v2 ->
+         (tapp (tabs x T t12) v2) ==> [x:=v2]t12
+  | ST_App1 : forall t1 t1' t2,
+         t1 ==> t1' ->
+         tapp t1 t2 ==> tapp t1' t2
+  | ST_App2 : forall v1 t2 t2',
+         value v1 ->
+         t2 ==> t2' -> 
+         tapp v1 t2 ==> tapp v1  t2'
+  | ST_IfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2,
+      (tif tfalse t1 t2) ==> t2
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif t1 t2 t3) ==> (tif t1' t2 t3)
+  | ST_FunnyIfTrue : forall t1 t2,
+      (tif ttrue t1 t2) ==> ttrue
+(*      (if true then t1 else t2) ==> true *)
+where "t1 '==>' t2" := (step t1 t2).
+
+Hint Constructors step.
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+    
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- tvar x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      extend Gamma x T11 |- t12 \in T12 -> 
+      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 -> 
+      Gamma |- t2 \in T11 -> 
+      Gamma |- tapp t1 t2 \in T12
+  | T_True : forall Gamma,
+       Gamma |- ttrue \in TBool
+  | T_False : forall Gamma,
+       Gamma |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TBool ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- tif t1 t2 t3 \in T
+
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+Hint Constructors has_type.
+
+Theorem not_step_deterministic :
+  not (deterministic step).
+Proof with eauto.
+  unfold deterministic, not; intros.
+  generalize (H (tif ttrue tfalse tfalse) tfalse ttrue); intro T; exploit T...
+  intro. inv H0.
+Qed.
+
+Lemma canonical_forms_bool : forall t,
+  empty |- t \in TBool ->
+  value t ->
+  (t = ttrue) \/ (t = tfalse).
+Proof.
+  intros t HT HVal.
+  inversion HVal; intros; subst; try inversion HT; auto.
+Qed.
+
+Theorem progress :
+  forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t').
+Proof with eauto.
+  induction t; intros; inv H...
+  inv H2.
+  generalize H3; intro.
+  generalize H5; intro.
+  apply IHt1 in H3.
+  apply IHt2 in H5.
+  right.
+  inv H3; inv H5.
+  inv H0; inv H...
+  inv H2. eexists...
+  inv H. eexists...
+  inv H. eexists...
+
+  right.
+  generalize H4; intro.
+  generalize H6; intro.
+  generalize H7; intro.
+  apply IHt1 in H4.
+  apply IHt2 in H6.
+  apply IHt3 in H7.
+  inv H4.
+  apply canonical_forms_bool in H...
+  inv H; eexists...
+  inv H; eexists...
+Qed.
+
+Theorem not_preservation : ~(forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T).
+Proof with eauto.
+  unfold not; intro.
+  generalize (H (tif ttrue
+                     (tabs x TBool (tvar x))
+                     (tabs x TBool (tvar x)))
+                ttrue
+                (TArrow TBool TBool)); intro T; exploit T.
+  repeat constructor. apply ST_FunnyIfTrue.
+  intro. inv H0.
+Qed.
+
+
+End stlc_variation4.
 
 (** **** Exercise: 2 stars, optional (stlc_variation5) *)
 (** Suppose instead that we add the following new rule to the typing relation:
@@ -692,6 +1814,565 @@ and the following typing rule:
 
 *)
 
+Module stlc_variation5.
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+    
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- tvar x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      extend Gamma x T11 |- t12 \in T12 -> 
+      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 -> 
+      Gamma |- t2 \in T11 -> 
+      Gamma |- tapp t1 t2 \in T12
+  | T_True : forall Gamma,
+       Gamma |- ttrue \in TBool
+  | T_False : forall Gamma,
+       Gamma |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TBool ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- tif t1 t2 t3 \in T
+  | T_FunnyApp : forall Gamma t1 t2,
+      Gamma |- t1 \in (TArrow (TArrow TBool TBool) TBool) ->
+      Gamma |- t2 \in TBool ->
+      Gamma |- (tapp t1 t2) \in TBool
+                                         
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+(*
+                 Gamma |- t1 \in Bool->Bool->Bool
+                     Gamma |- t2 \in Bool
+                 ------------------------------          (T_FunnyApp)
+                    Gamma |- t1 t2 \in Bool
+*)
+
+Hint Constructors has_type.
+
+(* determinstic step : not changed *)
+
+(*
+Theorem not_progress :
+  ~(forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t')).
+Proof with eauto.
+  unfold not; intros.
+  generalize (H
+  (tapp (tabs x (TArrow TBool TBool) (ttrue))
+(*   (tapp (tvar x) idB) *)
+(* ttrue *)
+  (tif ttrue tfalse tfalse)
+)
+  TBool);
+    intro T; exploit T.
+  apply T_FunnyApp...
+
+
+  
+  intro.
+  inv H0.
+  inv H1...
+
+  inv H1... 
+  inv H0...
+  inv H6. inv H4. inv H3. inv H5.
+  
+    ST_AppAbs : forall (x : id) (T : ty) (t12 v2 : tm),
+                value v2 -> tapp (tabs x T t12) v2 ==> [x := v2]t12
+  | ST_App1 : forall t1 t1' t2 : tm, t1 ==> t1' -> tapp t1 t2 ==> tapp t1' t2
+  | ST_App2 : forall v1 t2 t2' : tm,
+              value v1 -> t2 ==> t2' -> tapp v1 t2 ==> tapp v1 t2'
+  | ST_IfTrue : forall t1 t2 : tm, tif ttrue t1 t2 ==> t1
+Qed.
+
+      Gamma |- t1 \in (TArrow (TArrow TBool TBool) TBool) ->
+      Gamma |- t2 \in TBool ->
+      Gamma |- (tapp t1 t2) \in TBool
+*)
+
+Lemma canonical_forms_bool : forall t,
+  empty |- t \in TBool ->
+  value t ->
+  (t = ttrue) \/ (t = tfalse).
+Proof.
+  intros t HT HVal.
+  inversion HVal; intros; subst; try inversion HT; auto.
+Qed.
+
+Lemma canonical_forms_fun : forall t T1 T2,
+  empty |- t \in (TArrow T1 T2) ->
+  value t ->
+  exists x u, t = tabs x T1 u.
+Proof.
+  intros t T1 T2 HT HVal.
+  inversion HVal; intros; subst; try inversion HT; subst; auto.
+  exists x0. exists t0.  auto.
+Qed.
+
+Theorem progress :
+  forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t').
+Proof with eauto.
+  induction t; intros; inv H...
+  inv H2.
+  generalize H3; intro.
+  generalize H5; intro.
+  apply IHt1 in H3.
+  apply IHt2 in H5.
+  right.
+  inv H3; inv H5.
+  inv H0; inv H...
+  inv H2. eexists...
+  inv H. eexists...
+  inv H. eexists...
+
+  right.
+  generalize H3; intro; apply IHt1 in H3.
+  generalize H5; intro; apply IHt2 in H5.
+  inv H3; inv H5.
+  apply (canonical_forms_fun t1 (TArrow TBool TBool) TBool) in H...
+  inv H. inv H3.
+  eexists...
+
+  inv H2; eexists...
+  inv H; eexists...
+  inv H; eexists...
+  
+  right.
+  generalize H4; intro.
+  generalize H6; intro.
+  generalize H7; intro.
+  apply IHt1 in H4.
+  apply IHt2 in H6.
+  apply IHt3 in H7.
+  inv H4.
+  apply canonical_forms_bool in H...
+  inv H; eexists...
+  inv H; eexists...
+Qed.
+
+Inductive appears_free_in : id -> tm -> Prop :=
+  | afi_var : forall x,
+      appears_free_in x (tvar x)
+  | afi_app1 : forall x t1 t2,
+      appears_free_in x t1 -> appears_free_in x (tapp t1 t2)
+  | afi_app2 : forall x t1 t2,
+      appears_free_in x t2 -> appears_free_in x (tapp t1 t2)
+  | afi_abs : forall x y T11 t12,
+      y <> x  ->
+      appears_free_in x t12 ->
+      appears_free_in x (tabs y T11 t12)
+  | afi_if1 : forall x t1 t2 t3,
+      appears_free_in x t1 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if2 : forall x t1 t2 t3,
+      appears_free_in x t2 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if3 : forall x t1 t2 t3,
+      appears_free_in x t3 ->
+      appears_free_in x (tif t1 t2 t3).
+
+Hint Constructors appears_free_in.
+
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+Proof with eauto.
+  intros. 
+  generalize dependent Gamma'.
+  induction H; intros; auto.
+(*  has_type_cases (induction H) Case; intros; auto. *)
+  Case "T_Var".
+    apply T_Var. rewrite <- H0...
+  Case "T_Abs".
+    apply T_Abs.
+    apply IHhas_type. intros x1 Hafi.
+    (* the only tricky step... the [Gamma'] we use to 
+       instantiate is [extend Gamma x T11] *)
+    unfold extend. destruct (eq_id_dec x0 x1)... 
+  Case "T_App".
+    apply T_App with T11...  
+Qed.
+
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+Proof.
+  intros x t T Gamma H H0. generalize dependent Gamma. 
+  generalize dependent T. 
+  afi_cases (induction H) Case; 
+         intros; try solve [inversion H0; eauto].
+  Case "afi_abs".
+    inversion H1; subst.
+    apply IHappears_free_in in H7.
+    rewrite extend_neq in H7; assumption.
+Qed.
+
+Theorem substitution_preserves_typing : forall Gamma x U t v T,
+       extend Gamma x U |- t \in T ->
+       \empty |- v \in U -> Gamma |- [x := v]t \in T.
+Proof with eauto.
+  intros Gamma x U t v T Ht Ht'.
+  generalize dependent Gamma. generalize dependent T.
+  induction t; intros T Gamma H;
+(*  t_cases (induction t) Case; intros T Gamma H; *)
+    (* in each case, we'll want to get at the derivation of H *)
+    inversion H; subst; simpl...
+  Case "tvar".
+    rename i into y. destruct (eq_id_dec x y).
+    SCase "x=y".
+      subst. 
+      rewrite extend_eq in H2.
+      inversion H2; subst. clear H2.
+                  eapply context_invariance... intros x Hcontra.
+      destruct (free_in_context _ _ T empty Hcontra) as [T' HT']...
+      inversion HT'.
+    SCase "x<>y".
+      apply T_Var. rewrite extend_neq in H2... 
+  Case "tabs".
+    rename i into y. apply T_Abs.
+    destruct (eq_id_dec x y).
+    SCase "x=y".
+      eapply context_invariance...
+      subst.
+      intros x Hafi. unfold extend.
+      destruct (eq_id_dec y x)...
+    SCase "x<>y".
+      apply IHt. eapply context_invariance...
+      intros z Hafi. unfold extend.
+      destruct (eq_id_dec y z)...
+      subst. rewrite neq_id...   
+Qed.
+
+
+Example tmp : 
+    exists t', (tapp (tabs x (TArrow TBool TBool) ((tif ttrue ttrue ttrue)))
+        (ttrue)) ==> t'.
+Proof.
+  eexists... info_eauto.
+Qed.
+
+Example tmp2 :
+    (tapp (tabs x (TArrow TBool TBool) ((tif ttrue ttrue ttrue)))
+        (ttrue)) ==> [x := ttrue] (tif ttrue ttrue ttrue).
+Proof. info_auto. Qed.
+
+Inductive not_appears_in : id -> tm -> Prop :=
+  | nai_var : forall x y,
+                x <> y ->
+                not_appears_in x (tvar y)
+  | nai_app : forall x t1 t2,
+                not_appears_in x t1 ->
+                not_appears_in x t2 ->
+                not_appears_in x (tapp t1 t2)
+  | nai_abs : forall x y T t,
+                x <> y ->
+                not_appears_in x t ->
+                not_appears_in x (tabs y T t)
+  | nai_if : forall x t1 t2 t3,
+                not_appears_in x t1 ->
+                not_appears_in x t2 ->
+                not_appears_in x t3 ->
+                not_appears_in x (tif t1 t2 t3).
+
+Hint Constructors not_appears_in.
+
+(*
+Ltac neq_eq_id_dec a b H := destruct (eq_id_dec a b); subst. contradiction H.
+*)
+
+(*
+Ltac find_if_inside :=
+  match goal with
+    | [ |- context[if ?X then _ else _] ] => destruct X
+  end.
+*)
+(*
+Ltac find_neq :=
+  match goal with
+      H1: ?E = true |- _ => simpl.
+  end.
+*)
+                          
+Lemma not_appears_in_subst : forall x s t Gamma T,
+                               not_appears_in x t ->
+                               (Gamma |- [x := s]t \in T <->
+                               Gamma |- t \in T).
+Proof with eauto.
+  induction t; split; intros...
+  inv H; inv H0...
+    destruct (eq_id_dec x0 i); subst... contradiction H3... rewrite <- H...
+    destruct (eq_id_dec x0 i); subst... contradiction H3... rewrite <- H...
+    destruct (eq_id_dec x0 i); subst... contradiction H3... rewrite <- H...
+
+    destruct (eq_id_dec x0 i); subst... contradiction H3... rewrite <- H2...
+    destruct (eq_id_dec x0 i); subst... contradiction H3... rewrite <- H2...
+    destruct (eq_id_dec x0 i); subst... contradiction H3... rewrite <- H...
+    destruct (eq_id_dec x0 i); subst... contradiction H3... rewrite <- H...
+    
+  inv H; inv H0... unfold subst.
+    destruct (eq_id_dec x0 i); subst... contradiction H3...
+
+  inv H; inv H0...
+  eapply IHt1 in H4. eapply IHt2 in H5.
+  apply H4 in H3. apply H5 in H7.
+  eapply T_App...
+
+  eapply IHt1 in H4. eapply IHt2 in H5.
+  apply H4 in H3. apply H5 in H7.
+  eapply T_FunnyApp...
+
+  inv H; inv H0...
+    eapply IHt1 in H4. eapply IHt2 in H5.
+    apply H4 in H3. apply H5 in H7.
+    simpl. eapply T_App...
+
+    eapply IHt1 in H4. eapply IHt2 in H5.
+    apply H4 in H3. apply H5 in H7.
+    simpl. eapply T_FunnyApp...
+
+
+  inv H0; inv H.
+  eapply T_Abs.
+  destruct (eq_id_dec x0 i); subst...
+  eapply IHt in H5. apply H5 in H6...
+
+  inv H; inv H0...
+  eapply IHt in H6.
+  simpl. destruct (eq_id_dec x0 i); subst. contradiction H4...
+  constructor. apply H6 in H7...
+
+  inv H; inv H0... eapply IHt1 in H5. eapply IHt2 in H6. eapply IHt3 in H7.
+  apply H5 in H4. apply H6 in H9. apply H7 in H10.
+  constructor...
+
+  inv H; inv H0...
+  eapply IHt1 in H5. apply H5 in H4.
+  eapply IHt2 in H6. apply H6 in H9.
+  eapply IHt3 in H7. apply H7 in H10.
+  simpl. constructor...
+Qed.
+
+(*
+Lemma not_congruent_implies_not_appears_in : forall t Gamma x s,
+  Gamma |- s \in TBool ->
+  Gamma |- tabs x (TArrow TBool TBool) t
+                \in TArrow (TArrow TBool TBool) TBool ->
+  not_appears_in x t.
+Proof with eauto.
+  induction t; simpl; intros.
+  destruct (eq_id_dec x0 i); subst... inv H0. inv H3. rewrite extend_eq in H2. inversion H2.
+  inv H0; inv H3.
+  constructor. eapply IHt1... apply T_Abs in H4.
+
+Qed.
+*)
+
+Lemma not_congruent_implies_not_appears_in : forall t Gamma x s,
+  Gamma |- s \in TBool ->
+  value s ->
+  tapp (tabs x (TArrow TBool TBool) t) s ==> [x := s] t ->
+  Gamma |- tabs x (TArrow TBool TBool) t \in TArrow (TArrow TBool TBool) TBool ->
+  not_appears_in x t.
+Proof with eauto.
+  induction t; simpl; intros.
+  destruct (eq_id_dec x0 i); subst... inv H2. inv H5. rewrite extend_eq in H4. inversion H4.
+  constructor. eapply IHt1... inv H2.
+  Admitted.
+
+(*                                 
+  t2 : tm
+  H0 : \empty |- t2 \in TBool
+  IHhas_type2 : \empty = \empty ->
+                forall t' : tm, t2 ==> t' -> \empty |- t' \in TBool
+  x0 : id
+  t12 : tm
+  H5 : extend \empty x0 (TArrow TBool TBool) |- t12 \in TBool
+  IHhas_type1 : \empty = \empty ->
+                forall t' : tm,
+                tabs x0 (TArrow TBool TBool) t12 ==> t' ->
+                \empty |- t' \in TArrow (TArrow TBool TBool) TBool
+  M : \empty |- tabs x0 (TArrow TBool TBool) t12 \in
+      TArrow (TArrow TBool TBool) TBool
+  H7 : value t2
+  M1 : tapp (tabs x0 (TArrow TBool TBool) t12) t2 ==> [x0 := t2]t12
+  ============================
+   \empty |- [x0 := t2]t12 \in TBool
+*)
+
+
+(*
+  t1 : tm
+  t2 : tm
+  t' : tm
+  H1 : tapp t1 t2 ==> t'
+  H : \empty |- t1 \in TArrow (TArrow TBool TBool) TBool
+  H0 : \empty |- t2 \in TBool
+  IHhas_type1 : \empty = \empty ->
+                forall t'0 : tm,
+                t1 ==> t'0 ->
+                \empty |- t'0 \in TArrow (TArrow TBool TBool) TBool
+  IHhas_type2 : \empty = \empty ->
+                forall t'0 : tm, t2 ==> t'0 -> \empty |- t'0 \in TBool
+  M : \empty |- t1 \in TArrow (TArrow TBool TBool) TBool
+  M1 : tapp t1 t2 ==> t'
+  ============================
+   \empty |- t' \in TBool
+*)
+
+(*
+  t2 : tm
+  H0 : \empty |- t2 \in TBool
+  IHhas_type2 : \empty = \empty ->
+                forall t' : tm, t2 ==> t' -> \empty |- t' \in TBool
+  x0 : id
+  T : ty
+  t12 : tm
+  H5 : value t2
+  H : \empty |- tabs x0 T t12 \in TArrow (TArrow TBool TBool) TBool
+  IHhas_type1 : \empty = \empty ->
+                forall t' : tm,
+                tabs x0 T t12 ==> t' ->
+                \empty |- t' \in TArrow (TArrow TBool TBool) TBool
+  ============================
+   \empty |- [x0 := t2]t12 \in TBool
+*)
+(*
+Lemma abnea : forall t1 t2 x Gamma,
+                Gamma |- t2 \in TBool ->
+                value t2 ->
+                Gamma |- tabs x (TArrow TBool TBool) t1 \in TArrow (TArrow TBool TBool) TBool ->
+                not_appears_in x t1.
+Proof with eauto.
+  induction t1; simpl; intros.
+  admit.
+  constructor. eapply IHt1_1... inv H1. inv H4.
+Qed.
+*)                     
+
+Theorem preservation : forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T.
+Proof with eauto.
+  intros. generalize dependent t'.
+  remember (empty) as Gamma.  
+(*  remember (@empty ty) as Gamma. *)
+  induction H; intros; (* inv H0...; *)
+  subst Gamma; subst; 
+(*  inv HeqGamma; *)
+  try solve [inv H0].
+  inv H1...
+  eapply substitution_preserves_typing... inv H...
+  inv H2...
+
+  generalize H; intro M.
+  generalize H1; intro M1.  
+  inv H; inv H1...
+  assert(G : not_appears_in x0 t12).
+  apply not_congruent_implies_not_appears_in with (Gamma:=empty) (s:=t2)...
+  apply not_appears_in_subst...
+  apply substitution_preserves_typing with (v:=idB) in H5.
+  apply not_appears_in_subst in H5...
+  constructor...
+(*  inv H1... *)
+(*
+  generalize H; intro M.
+  generalize H1; intro M1.
+  inv H1... inv H...
+  apply substitution_preserves_typing with (TBool)...  
+  eapply substitution_preserves_typing...
+  apply substitution_preserves_typing with (TBool)...
+  eapply context_invariance. apply H3.
+  intros. eapply free_in_context in H... inv H.
+  destruct (eq_id_dec x0 x1); subst. rewrite extend_eq in H1. inv H1.
+  rewrite extend_eq. rewrite extend_eq.
+
+       appears_free_in x t ->
+       Gamma |- t \in T -> exists T' : ty, Gamma x = Some T'  
+  
+  apply context_invariance with (empty).
+  
+  eapply substitution_preserves_typing. apply H3.
+
+  apply context_invariance with (empty).
+  
+  inv H1... inv H... eapply substitution_preserves_typing... 
+
+  generalize (T_FunnyApp empty t1 t2); intro T; exploit T...
+  intro; clear T.
+  inv H2... inv H6; inv H... inversion H5.
+  inv H1... eapply substitution_preserves_typing...
+  inv H1... inv H1...
+  
+(*                                             
+  inv H1...
+
+  | T_FunnyApp : forall (Gamma : context) (t1 t2 : tm),
+                 Gamma |- t1 \in TArrow (TArrow TBool TBool) TBool ->
+                 Gamma |- t2 \in TBool -> Gamma |- tapp t1 t2 \in TBool  
+  eapply T_FunnyApp.
+  
+  inv H1; inv H; inv H0...
+  inv H.
+  eapply substitution_preserves_typing... inv H5.
+  eapply substitution_preserves_typing...
+  
+  inv H1... eapply substitution_preserves_typing...
+*)
+  Abort.
+*)
+Qed.
+
+(*
+Theorem not_preservation : ~(forall T t t',
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T).
+Proof with eauto.
+  unfold not; intro.
+  remember (tapp (tabs x (TArrow TBool TBool) (ttrue))
+                 (tapp (tvar x) ttrue)
+           ) as t.
+  generalize (H TBool t); intro T; exploit T.
+  subst. apply T_FunnyApp.
+  constructor. constructor. constructor. constructor.
+  constructor.
+  
+  unfold not; intro.
+  remember (tapp (tabs x (TArrow TBool TBool) (ttrue))
+                 ttrue
+           ) as t.
+  generalize (H TBool t); intro T; exploit T.
+  subst. apply T_FunnyApp...
+  subst. apply ST_AppAbs...
+  intro. inv H0.
+
+
+
+  generalize (H
+  (tapp (tabs x (TArrow TBool TBool) ((tif ttrue ttrue ttrue)))
+        (ttrue))
+  );
+
+  intro T; exploit T...
+
+
+  value v2 -> tapp (tabs x T t12) v2 ==> [x := v2]t12
+  intro. inv H0.
+  apply T_FunnyApp...  
+Qed.
+*)
+
+
+End stlc_variation5.
+
+
 (** **** Exercise: 2 stars, optional (stlc_variation6) *)
 (** Suppose instead that we add the following new rule to the typing relation:
                      Gamma |- t1 \in Bool
@@ -711,6 +2392,185 @@ and the following typing rule:
 
 *)
 
+
+Module stlc_variation6.
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+    
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- tvar x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      extend Gamma x T11 |- t12 \in T12 -> 
+      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 -> 
+      Gamma |- t2 \in T11 -> 
+      Gamma |- tapp t1 t2 \in T12
+  | T_True : forall Gamma,
+       Gamma |- ttrue \in TBool
+  | T_False : forall Gamma,
+       Gamma |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TBool ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- tif t1 t2 t3 \in T
+  | T_FunnyApp' : forall Gamma t1 t2,
+      Gamma |- t1 \in TBool->
+      Gamma |- t2 \in TBool ->
+      Gamma |- (tapp t1 t2) \in TBool
+                                         
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+Hint Constructors has_type.
+
+(* step : same *)
+
+Lemma canonical_forms_bool : forall t,
+  empty |- t \in TBool ->
+  value t ->
+  (t = ttrue) \/ (t = tfalse).
+Proof.
+  intros t HT HVal.
+  inversion HVal; intros; subst; try inversion HT; auto.
+Qed.
+
+Lemma canonical_forms_fun : forall t T1 T2,
+  empty |- t \in (TArrow T1 T2) ->
+  value t ->
+  exists x u, t = tabs x T1 u.
+Proof.
+  intros t T1 T2 HT HVal.
+  inversion HVal; intros; subst; try inversion HT; subst; auto.
+  exists x0. exists t0.  auto.
+Qed.
+
+Theorem not_progress :
+  ~(forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t')).
+Proof.
+  unfold not; intros.
+  generalize (H (tapp ttrue ttrue) TBool); intro T; exploit T; auto.
+  intro. inv H0. inv H1. inv H1. inv H0. inv H4. inv H5.
+Qed.
+
+Inductive appears_free_in : id -> tm -> Prop :=
+  | afi_var : forall x,
+      appears_free_in x (tvar x)
+  | afi_app1 : forall x t1 t2,
+      appears_free_in x t1 -> appears_free_in x (tapp t1 t2)
+  | afi_app2 : forall x t1 t2,
+      appears_free_in x t2 -> appears_free_in x (tapp t1 t2)
+  | afi_abs : forall x y T11 t12,
+      y <> x  ->
+      appears_free_in x t12 ->
+      appears_free_in x (tabs y T11 t12)
+  | afi_if1 : forall x t1 t2 t3,
+      appears_free_in x t1 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if2 : forall x t1 t2 t3,
+      appears_free_in x t2 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if3 : forall x t1 t2 t3,
+      appears_free_in x t3 ->
+      appears_free_in x (tif t1 t2 t3).
+
+Hint Constructors appears_free_in.
+
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+Proof with eauto.
+  intros. 
+  generalize dependent Gamma'.
+  induction H; intros; auto.
+(*  has_type_cases (induction H) Case; intros; auto. *)
+  Case "T_Var".
+    apply T_Var. rewrite <- H0...
+  Case "T_Abs".
+    apply T_Abs.
+    apply IHhas_type. intros x1 Hafi.
+    (* the only tricky step... the [Gamma'] we use to 
+       instantiate is [extend Gamma x T11] *)
+    unfold extend. destruct (eq_id_dec x0 x1)... 
+  Case "T_App".
+    apply T_App with T11...  
+Qed.
+
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+Proof.
+  intros x t T Gamma H H0. generalize dependent Gamma. 
+  generalize dependent T. 
+  afi_cases (induction H) Case; 
+         intros; try solve [inversion H0; eauto].
+  Case "afi_abs".
+    inversion H1; subst.
+    apply IHappears_free_in in H7.
+    rewrite extend_neq in H7; assumption.
+Qed.
+
+Theorem substitution_preserves_typing : forall Gamma x U t v T,
+       extend Gamma x U |- t \in T ->
+       \empty |- v \in U -> Gamma |- [x := v]t \in T.
+Proof with eauto.
+  intros Gamma x U t v T Ht Ht'.
+  generalize dependent Gamma. generalize dependent T.
+  induction t; intros T Gamma H;
+(*  t_cases (induction t) Case; intros T Gamma H; *)
+    (* in each case, we'll want to get at the derivation of H *)
+    inversion H; subst; simpl...
+  Case "tvar".
+    rename i into y. destruct (eq_id_dec x y).
+    SCase "x=y".
+      subst. 
+      rewrite extend_eq in H2.
+      inversion H2; subst. clear H2.
+                  eapply context_invariance... intros x Hcontra.
+      destruct (free_in_context _ _ T empty Hcontra) as [T' HT']...
+      inversion HT'.
+    SCase "x<>y".
+      apply T_Var. rewrite extend_neq in H2... 
+  Case "tabs".
+    rename i into y. apply T_Abs.
+    destruct (eq_id_dec x y).
+    SCase "x=y".
+      eapply context_invariance...
+      subst.
+      intros x Hafi. unfold extend.
+      destruct (eq_id_dec y x)...
+    SCase "x<>y".
+      apply IHt. eapply context_invariance...
+      intros z Hafi. unfold extend.
+      destruct (eq_id_dec y z)...
+      subst. rewrite neq_id...   
+Qed.
+
+Theorem preservation : forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T.
+Proof with eauto.
+  intros. generalize dependent t'.
+  remember (empty) as Gamma.  
+  induction H; intros; subst Gamma; subst; 
+  try solve [inv H0].
+  inv H1...
+  eapply substitution_preserves_typing... inv H...
+  inv H2...
+
+  generalize H; intro M.
+  generalize H1; intro M1.  
+  inv H; inv H1...
+Qed.
+
+End stlc_variation6.
+
+
 (** **** Exercise: 2 stars, optional (stlc_variation7) *)
 (** Suppose we add the following new rule to the typing
     relation of the STLC:
@@ -729,6 +2589,185 @@ and the following typing rule:
 
 []
 *)
+
+Module stlc_variation7.
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+    
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- tvar x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      extend Gamma x T11 |- t12 \in T12 -> 
+      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 -> 
+      Gamma |- t2 \in T11 -> 
+      Gamma |- tapp t1 t2 \in T12
+  | T_True : forall Gamma,
+       Gamma |- ttrue \in TBool
+  | T_False : forall Gamma,
+       Gamma |- tfalse \in TBool
+  | T_If : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TBool ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- tif t1 t2 t3 \in T
+  | T_FunnyAbs : forall Gamma x t,
+       Gamma |- (tabs x TBool t) \in TBool
+
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+Hint Constructors has_type.
+
+(* step : same *)
+
+(*
+Lemma canonical_forms_bool : forall t,
+  empty |- t \in TBool ->
+  value t ->
+  (t = ttrue) \/ (t = tfalse).
+Proof.
+  intros t HT HVal.
+  inversion HVal; intros; subst; try inversion HT; auto.
+Qed.
+*)
+
+Lemma canonical_forms_fun : forall t T1 T2,
+  empty |- t \in (TArrow T1 T2) ->
+  value t ->
+  exists x u, t = tabs x T1 u.
+Proof.
+  intros t T1 T2 HT HVal.
+  inversion HVal; intros; subst; try inversion HT; subst; auto.
+  exists x0. exists t0.  auto.
+Qed.
+
+Theorem progress :
+  ~(forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t')).
+Proof.
+  unfold not; intro.
+  generalize (H (tif (tabs x TBool ttrue) tfalse tfalse) TBool); intro T; exploit T; auto.
+  intro. inv H0. inv H1. inv H1. inv H0. inv H5.
+Qed.
+
+Inductive appears_free_in : id -> tm -> Prop :=
+  | afi_var : forall x,
+      appears_free_in x (tvar x)
+  | afi_app1 : forall x t1 t2,
+      appears_free_in x t1 -> appears_free_in x (tapp t1 t2)
+  | afi_app2 : forall x t1 t2,
+      appears_free_in x t2 -> appears_free_in x (tapp t1 t2)
+  | afi_abs : forall x y T11 t12,
+      y <> x  ->
+      appears_free_in x t12 ->
+      appears_free_in x (tabs y T11 t12)
+  | afi_if1 : forall x t1 t2 t3,
+      appears_free_in x t1 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if2 : forall x t1 t2 t3,
+      appears_free_in x t2 ->
+      appears_free_in x (tif t1 t2 t3)
+  | afi_if3 : forall x t1 t2 t3,
+      appears_free_in x t3 ->
+      appears_free_in x (tif t1 t2 t3).
+
+Hint Constructors appears_free_in.
+
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+Proof with eauto.
+  intros. 
+  generalize dependent Gamma'.
+  induction H; intros; auto.
+(*  has_type_cases (induction H) Case; intros; auto. *)
+  Case "T_Var".
+    apply T_Var. rewrite <- H0...
+  Case "T_Abs".
+    apply T_Abs.
+    apply IHhas_type. intros x1 Hafi.
+    (* the only tricky step... the [Gamma'] we use to 
+       instantiate is [extend Gamma x T11] *)
+    unfold extend. destruct (eq_id_dec x0 x1)... 
+  Case "T_App".
+    apply T_App with T11...  
+Qed.
+
+(*
+Theorem not_preservation : ~(forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T).
+Proof with eauto.
+  unfold not; intro.
+  generalize (H
+                (tif (tif ttrue (tabs x TBool ttrue) tfalse) ttrue ttrue)
+                (tif (tabs x TBool ttrue) ttrue ttrue)
+                TBool
+             );
+    intro T; exploit T.
+  apply T_If. apply T_If... constructor. constructor.
+  repeat constructor.
+  intro. inv H0. inv H5.
+Qed.
+                 Gamma |- tabs x TBool t \in TBool
+*)
+
+Lemma free_in_context :
+  ~(forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T').
+Proof.
+  unfold not; intros.
+  generalize (H y (tabs x TBool (tvar y))
+                TBool
+                (extend empty y TBool)
+             ); intro T; exploit T.
+  constructor. unfold not; intro; inv H0. constructor.
+  constructor. intro.
+  inv H0. inv H1.
+  
+Abort.
+
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+Proof.
+  intros x t T Gamma H H0. generalize dependent Gamma. 
+  generalize dependent T. 
+  afi_cases (induction H) Case; 
+         intros; try solve [inversion H0; eauto].
+  Case "afi_abs".
+    inversion H1; subst.
+    apply IHappears_free_in in H7.
+    rewrite extend_neq in H7; assumption.
+Abort.
+
+Theorem substitution_preserves_typing : forall Gamma x U t v T,
+       extend Gamma x U |- t \in T ->
+       \empty |- v \in U -> Gamma |- [x := v]t \in T.
+Proof with eauto.
+  Admitted.
+
+Theorem preservation : forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T.
+Proof with eauto.
+  intros. generalize dependent t'.
+  remember (empty) as Gamma.  
+  induction H; intros; subst Gamma; subst; 
+  try solve [inv H0].
+  inv H1...
+  eapply substitution_preserves_typing... inv H...
+  inv H2...
+Qed.
+
+End stlc_variation7.
+
 
 End STLCProp.
 
@@ -787,6 +2826,394 @@ Tactic Notation "t_cases" tactic(first) ident(c) :=
 
 (* FILL IN HERE *)
 (** [] *)
+
+Reserved Notation "'[' x ':=' s ']' t" (at level 20).
+
+Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
+  match t with
+  | tvar x' => 
+      if eq_id_dec x x' then s else t
+  | tabs x' T t1 => 
+      tabs x' T (if eq_id_dec x x' then t1 else ([x:=s] t1)) 
+  | tapp t1 t2 => 
+      tapp ([x:=s] t1) ([x:=s] t2)
+  | tnat n => 
+      tnat n
+  | tsucc t => 
+      tsucc ([x:=s] t)
+  | tpred t => 
+      tpred ([x:=s] t)
+  | tmult t1 t2 =>
+      tmult ([x:=s] t1) ([x:=s] t2)
+  | tif0 t1 t2 t3 => 
+      tif0 ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
+  end
+
+where "'[' x ':=' s ']' t" := (subst x s t).
+
+Inductive value : tm -> Prop :=
+  | v_abs : forall x T t,
+      value (tabs x T t)
+  | v_nat : forall n,
+      value (tnat n).
+
+
+(*
+    nv_zero : nvalue tzero
+  | nv_succ : forall t : Types.tm, nvalue t -> nvalue (Types.tsucc t)
+*)
+Hint Constructors value.
+
+Reserved Notation "t1 '==>' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_AppAbs : forall x T t12 v2,
+         value v2 ->
+         (tapp (tabs x T t12) v2) ==> [x:=v2]t12
+  | ST_App1 : forall t1 t1' t2,
+         t1 ==> t1' ->
+         tapp t1 t2 ==> tapp t1' t2
+  | ST_App2 : forall v1 t2 t2',
+         value v1 ->
+         t2 ==> t2' -> 
+         tapp v1 t2 ==> tapp v1  t2'
+  | ST_IfTrue : forall t1 t2,
+      (tif0 (tnat 0) t1 t2) ==> t1
+  | ST_IfFalse : forall t1 t2 n,
+      (tif0 (tnat (S n)) t1 t2) ==> t1                            
+  | ST_If : forall t1 t1' t2 t3,
+      t1 ==> t1' ->
+      (tif0 t1 t2 t3) ==> (tif0 t1' t2 t3)
+  | ST_Succ : forall t t',
+      t ==> t' ->
+      tsucc t ==> tsucc t'
+  | ST_Pred : forall t t',
+      t ==> t' -> 
+      tpred t ==> tpred t'
+  | ST_Mult1 : forall t1 t1' t2,
+      t1 ==> t1' ->
+      tmult t1 t2 ==> tmult t1' t2
+  | ST_Mult2 : forall t1 t2 t2',
+      value t1 ->
+      t2 ==> t2' ->
+      tmult t1 t2 ==> tmult t1 t2'
+  | ST_NatSucc : forall n,
+      tsucc (tnat n) ==> (tnat (S n))
+  | ST_NatPredZero :
+      tpred (tnat 0) ==> (tnat 0)
+  | ST_NatPred : forall n,
+      tpred (tnat (S n)) ==> (tnat n)
+  | ST_NatMult : forall n m,
+      tmult (tnat n) (tnat m) ==> (tnat (mult n m))
+(*            
+  | ST_NatPredSucc : forall n,
+      tpred (tsucc (tnat n)) ==> (tnat n)
+*)
+where "t1 '==>' t2" := (step t1 t2).
+
+Tactic Notation "step_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "ST_AppAbs" | Case_aux c "ST_App1" 
+  | Case_aux c "ST_App2"
+  | Case_aux c "ST_IfTrue"
+  | Case_aux c "ST_IfFalse"             
+  | Case_aux c "ST_If"
+  | Case_aux c "ST_Succ"
+  | Case_aux c "ST_Pred"
+  | Case_aux c "ST_Mult1"
+  | Case_aux c "ST_Mult2"
+  | Case_aux c "ST_NatSucc"
+  | Case_aux c "ST_NatPredZero"
+  | Case_aux c "ST_NatPred"
+  | Case_aux c "ST_NatMult"             
+(*  | Case_aux c "ST_NatPredSucc" *)
+             ].
+
+Hint Constructors step.
+
+Theorem step_deterministic :
+  deterministic step.
+Proof with eauto.
+  unfold deterministic.
+  intros.
+  generalize dependent y2.
+  step_cases (induction H) Case; intros...; inv H0...
+(*  induction H; intros...; inv H0... *)
+  Case "ST_AppAbs".
+  inv H0... inv H4... inv H3.
+  inv H; inv H5...
+
+  Case "ST_App1".
+  inv H0... inv H... apply IHstep in H4; subst...
+  inv H; inv H3...
+  Case "ST_App2".
+  inv H1... inv H5; inv H... inv H0. inv H0. inv H; inv H5...
+  apply IHstep in H6; subst...
+
+  Case "ST_IfTrue".
+  inv H0... inv H4...
+
+  Case "ST_IfFalse".
+  inv H0... inv H4...
+  
+  Case "ST_If".
+  inv H0... inv H... inv H. apply IHstep in H5; subst...
+  
+  Case "ST_Succ".
+  inv H0... apply IHstep in H2; subst... inv H.
+  
+  Case "ST_Pred".
+  inv H0... apply IHstep in H2; subst...
+  inv H. inv H. 
+  
+  Case "ST_Mult1".
+  inv H0... apply IHstep in H4; subst... inv H3; inv H...
+  inv H...
+
+  Case "ST_Mult2".
+  inv H1... inv H; inv H5. apply IHstep in H6; subst...
+  inv H0...
+
+  Case "ST_NatSucc".
+  inv H0... inv H1. inv H0... inv H1.
+
+  Case "ST_NatPred".
+  inv H0... inv H1...
+
+  Case "ST_NatMult".
+  inv H0... inv H3. inv H4.
+Qed.
+
+Notation multistep := (multi step).
+Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+
+Definition context := partial_map ty.
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- tvar x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      extend Gamma x T11 |- t12 \in T12 -> 
+      Gamma |- tabs x T11 t12 \in TArrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in TArrow T11 T12 -> 
+      Gamma |- t2 \in T11 -> 
+      Gamma |- tapp t1 t2 \in T12
+  | T_Nat : forall Gamma n,
+       Gamma |- (tnat n) \in TNat
+  | T_If0 : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in TNat ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- tif0 t1 t2 t3 \in T
+
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+Tactic Notation "has_type_cases" tactic(first) ident(c) :=
+  first;
+  [ Case_aux c "T_Var" | Case_aux c "T_Abs" 
+  | Case_aux c "T_App" | Case_aux c "T_If0"
+  | Case_aux c "T_Nat"
+  ].
+
+Hint Constructors has_type.
+
+Lemma canonical_forms_nat : forall t,
+  empty |- t \in TNat ->
+  value t ->
+  exists n, t = tnat n.
+Proof with eauto.
+  intros t HT HVal.
+  inv HVal. inv HT. eexists...
+Qed.
+
+Lemma canonical_forms_fun : forall t T1 T2,
+  empty |- t \in (TArrow T1 T2) ->
+  value t ->
+  exists x u, t = tabs x T1 u.
+Proof.
+  intros t T1 T2 HT HVal.
+  inversion HVal; intros; subst; try inversion HT; subst; auto.
+  inv HT... 
+  exists x. exists t0.  auto.
+Qed.
+
+Theorem progress :
+  forall t T,
+      \empty |- t \in T ->
+      value t \/ (exists t', t ==> t').
+Proof with eauto.
+  intros t.
+  t_cases (induction t) Case; intros T Ht; auto.
+
+  inv Ht. inversion H1.
+  inv Ht.
+  generalize H2; intro H1.
+  generalize H4; intro H3.
+  apply IHt1 in H2.
+  apply IHt2 in H4.
+  right.
+  inv H4. inv H2.
+  inv H1; inv H0.
+  eexists. (*using it to early, right after right, will make next line not work *)
+  apply ST_AppAbs...
+  inv H0. eexists. apply ST_App1...
+  inv H2. inv H. eexists. apply ST_App2...
+  inv H. inv H0. eexists. apply ST_App1...
+
+  inv Ht.
+  inv Ht.
+  inv Ht. 
+  inv Ht. generalize H3; intro T1. apply IHt1 in H3. right. inv H3.
+  apply canonical_forms_nat in T1. inv T1. eexists... destruct x...
+  assumption. inv H. eexists...
+Qed.
+
+Inductive appears_free_in : id -> tm -> Prop :=
+  | afi_var : forall x,
+      appears_free_in x (tvar x)
+  | afi_app1 : forall x t1 t2,
+      appears_free_in x t1 -> appears_free_in x (tapp t1 t2)
+  | afi_app2 : forall x t1 t2,
+      appears_free_in x t2 -> appears_free_in x (tapp t1 t2)
+  | afi_abs : forall x y T11 t12,
+      y <> x  ->
+      appears_free_in x t12 ->
+      appears_free_in x (tabs y T11 t12)
+  | afi_if0_1 : forall x t1 t2 t3,
+      appears_free_in x t1 ->
+      appears_free_in x (tif0 t1 t2 t3)
+  | afi_if0_2 : forall x t1 t2 t3,
+      appears_free_in x t2 ->
+      appears_free_in x (tif0 t1 t2 t3)
+  | afi_if0_3 : forall x t1 t2 t3,
+      appears_free_in x t3 ->
+      appears_free_in x (tif0 t1 t2 t3)
+  | afi_tsucc : forall x t,
+      appears_free_in x t ->
+      appears_free_in x (tsucc t)
+  | afi_tpred : forall x t,
+      appears_free_in x t ->
+      appears_free_in x (tpred t)
+  | afi_tmult1 : forall x t1 t2,
+      appears_free_in x t1 ->
+      appears_free_in x (tmult t1 t2)
+  | afi_tmult2 : forall x t1 t2,
+      appears_free_in x t2 ->
+      appears_free_in x (tmult t1 t2)
+.
+
+Hint Constructors appears_free_in.
+
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+Proof with eauto.
+  intros. 
+  generalize dependent Gamma'.
+  induction H; intros; auto.
+(*  has_type_cases (induction H) Case; intros; auto. *)
+  Case "T_Var".
+    apply T_Var. rewrite <- H0...
+  Case "T_Abs".
+    apply T_Abs.
+    apply IHhas_type. intros x1 Hafi.
+    (* the only tricky step... the [Gamma'] we use to 
+       instantiate is [extend Gamma x T11] *)
+    unfold extend. destruct (eq_id_dec x x1)... 
+  Case "T_App".
+    apply T_App with T11...  
+Qed.
+
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+Proof.
+  intros x t T Gamma H H0. generalize dependent Gamma. 
+  generalize dependent T. 
+  induction H;
+         intros; try solve [inversion H0; eauto].
+    inversion H1; subst.
+    apply IHappears_free_in in H7.
+    rewrite extend_neq in H7; assumption.
+Qed.
+
+Theorem substitution_preserves_typing : forall Gamma x U t v T,
+       extend Gamma x U |- t \in T ->
+       \empty |- v \in U -> Gamma |- [x := v]t \in T.
+Proof with eauto.
+  intros Gamma x U t v T Ht Ht'.
+  generalize dependent Gamma. generalize dependent T.
+  induction t; intros T Gamma H;
+(*  t_cases (induction t) Case; intros T Gamma H; *)
+    (* in each case, we'll want to get at the derivation of H *)
+    inversion H; subst; simpl...
+  Case "tvar".
+    rename i into y. destruct (eq_id_dec x y).
+    SCase "x=y".
+      subst. 
+      rewrite extend_eq in H2.
+      inversion H2; subst. clear H2.
+                  eapply context_invariance... intros x Hcontra.
+      destruct (free_in_context _ _ T empty Hcontra) as [T' HT']...
+      inversion HT'.
+    SCase "x<>y".
+      apply T_Var. rewrite extend_neq in H2... 
+  Case "tabs".
+    rename i into y. apply T_Abs.
+    destruct (eq_id_dec x y).
+    SCase "x=y".
+      eapply context_invariance...
+      subst.
+      intros x Hafi. unfold extend.
+      destruct (eq_id_dec y x)...
+    SCase "x<>y".
+      apply IHt. eapply context_invariance...
+      intros z Hafi. unfold extend.
+      destruct (eq_id_dec y z)...
+      subst. rewrite neq_id...   
+Qed.
+
+Theorem preservation : forall t t' T,
+       \empty |- t \in T -> t ==> t' -> \empty |- t' \in T.
+Proof with eauto.
+  intros; generalize dependent t'.
+  remember empty as Gamma.
+  induction H; intros; subst; try solve [inv H0].
+  inv H1... eapply substitution_preserves_typing. inv H...
+  inv H...
+
+  inv H2...
+Qed.
+
+Definition stuck (t:tm) : Prop :=
+  (normal_form step) t /\ ~ value t.
+
+Corollary soundness : forall t t' T,
+  empty |- t \in T -> 
+  t ==>* t' ->
+  ~(stuck t').
+Proof.
+  intros t t' T Hhas_type Hmulti. unfold stuck.
+  intros [Hnf Hnot_val]. unfold normal_form in Hnf.
+  induction Hmulti.
+
+
+  unfold not in Hnf.
+  unfold not in Hnot_val.
+  apply progress in Hhas_type.
+  inv Hhas_type. apply Hnot_val in H. inv H.
+  apply Hnf in H. inv H.
+
+  generalize (preservation x y T Hhas_type H); intro.
+  apply IHHmulti in H0. inv H0.
+  assumption.
+  assumption.
+Qed.
 
 End STLCArith.
 
