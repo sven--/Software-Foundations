@@ -611,18 +611,37 @@ if 3=0 then 1 else 3 * (fix F (pred 3))
         else if (pred x)=0 then 0
         else 1 + (halve (pred (pred x))))
 >>
-(* FILL IN HERE *)
-[]
+(fix F)
+where
+F = \f. \x. if x=0 then 0 else
+                   (if (pred x)=0 then 0 else 1 + (f (pred (pred x))))
 *)
 
 (** **** Exercise: 1 star (fact_steps) *)
 (** Write down the sequence of steps that the term [fact 1] goes
     through to reduce to a normal form (assuming the usual reduction
     rules for arithmetic operations).
-
-    (* FILL IN HERE *)
-[]
 *)
+(*
+assuming fact = fix F,
+fact 1 ==>
+fix F 1 ==>
+[xf:=fix F]t2 1
+= \x. if x=0 then 1 else x * (fix F (pred x)) 1
+==>
+if 1=0 then 1 else 1 * (fix F (pred 1))
+==>
+1 * (fix F (pred 1))
+==>
+1 * (\x. if x=0 then 1 else x * (fix F (pred x))) (pred 1)
+==>
+1 * (if 0=0 then 1 else 0 * (fix F (pred 0)))
+==>
+1 * 1
+==>
+1
+*)
+
 
 (** The ability to form the fixed point of a function of type [T->T]
     for any [T] has some surprising consequences.  In particular, it
@@ -994,7 +1013,15 @@ Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
   | tsnd t1 => 
       tsnd (subst x s t1)
   | tunit => tunit
-  (* FILL IN HERE *)
+  | tlet var t1 t2 =>
+(*        subst var (subst x s t1) *)
+(*    
+      if (eq_id_dec var x)
+      then tlet var (subst x s t1) t2
+      else tlet var (subst x s t1) (subst x s t2)
+*)
+    tlet var (subst x s t1) (if (eq_id_dec var x) then t2 else (subst x s t2))
+          (* i.e., [let x = t1 in t2] *)    
   | tinl T t1 => 
       tinl T (subst x s t1)
   | tinr T t1 => 
@@ -1013,8 +1040,9 @@ Fixpoint subst (x:id) (s:tm) (t:tm) : tm :=
            t3 
          else if eq_id_dec x y2 then t3 
               else (subst x s t3))
+  | tfix f =>
+      tfix (subst x s f)
 (* FILL IN HERE *)
-  | _ => t  (* ... and delete this line *) 
   end.
 
 Notation "'[' x ':=' s ']' t" := (subst x s t) (at level 20).
@@ -1118,7 +1146,12 @@ Inductive step : tm -> tm -> Prop :=
         value v2 ->
         (tsnd (tpair v1 v2)) ==> v2
   (* let *)
-  (* FILL IN HERE *)
+  | ST_Let1 : forall var t1 t1' t2,
+        t1 ==> t1' ->
+        (tlet var t1 t2) ==> (tlet var t1' t2)
+  | ST_LetValue : forall var v t,
+        value v ->
+        (tlet var v t) ==> [var:=v]t
   (* sums *)
   | ST_Inl : forall t1 t1' T,
         t1 ==> t1' ->
@@ -1152,7 +1185,12 @@ Inductive step : tm -> tm -> Prop :=
        value v1  ->
        value vl  ->
        (tlcase (tcons v1 vl) t2 x1 x2 t3) ==> (subst x2 vl (subst x1 v1 t3))
-  (* fix *)
+  | ST_Fix1 : forall t1 t1',
+       t1 ==> t1' ->
+       tfix t1 ==> tfix t1'
+  | ST_FixAbs : forall xf T1 t2,
+       tfix (tabs xf T1 t2) ==>
+       [xf:=tfix (tabs xf T1 t2)]t2
 (* FILL IN HERE *)
 
 where "t1 '==>' t2" := (step t1 t2).
@@ -1168,18 +1206,76 @@ Tactic Notation "step_cases" tactic(first) ident(c) :=
   | Case_aux c "ST_Pair1" | Case_aux c "ST_Pair2"
     | Case_aux c "ST_Fst1" | Case_aux c "ST_FstPair"
     | Case_aux c "ST_Snd1" | Case_aux c "ST_SndPair"
-    (* FILL IN HERE *)
+    | Case_aux c "ST_Let1" | Case_aux c "ST_LetValue"
   | Case_aux c "ST_Inl" | Case_aux c "ST_Inr" | Case_aux c "ST_Case"
     | Case_aux c "ST_CaseInl" | Case_aux c "ST_CaseInr"
   | Case_aux c "ST_Cons1" | Case_aux c "ST_Cons2" | Case_aux c "ST_Lcase1"
     | Case_aux c "ST_LcaseNil" | Case_aux c "ST_LcaseCons"
-(* FILL IN HERE *)
+    | Case_aux c "ST_Fix1" | Case_aux c "ST_FixAbs"
   ].
 
 Notation multistep := (multi step).
 Notation "t1 '==>*' t2" := (multistep t1 t2) (at level 40).
 
 Hint Constructors step.
+
+Lemma value_not_step : forall v v',
+  value v -> (v ==> v') -> False.
+Proof with eauto.
+  unfold not.
+  t_cases (induction v) Case; intros; try solve [inv H0]...
+  inv H0. inv H. inv H. inv H.
+  inv H0. apply IHv in H2... inv H. inv H.
+  inv H0. inv H. inv H.
+  inv H0. inv H. inv H. inv H.
+  inv H0. inv H. inv H. inv H.
+  inv H0. inv H. apply IHv1 in H4... inv H. apply IHv2 in H5...
+  inv H.
+  inv H.
+  inv H.
+  inv H. inv H0. apply IHv in H4...
+  inv H. inv H0. apply IHv in H4...
+  inv H.
+  inv H. inv H0. apply IHv1 in H5... apply IHv2 in H6...
+  inv H.
+  inv H.
+Qed.
+
+Ltac find_value_step :=
+  match goal with
+      H1: value ?E, H2: ?E ==> _ |- _ =>
+      eapply value_not_step in H1; eauto; inv H1
+  end.
+
+Ltac find_IH_target :=
+  match goal with
+      H1 : ?t1 ==> ?t2,
+      H2 : ?t1 ==> ?t2',
+      IH : forall x, ?t1 ==> x -> ?t2 = x |- _ =>
+      eapply IH in H2; subst; eauto
+  end.
+
+Ltac find_step_to_inv :=
+  match goal with
+      H: ?t ==> ?t' |- _ => inv H
+  end.
+
+Tactic Notation "verify" :=
+  repeat (eauto; find_step_to_inv; eauto; try find_value_step; eauto; try find_IH_target).
+
+Theorem step_deterministic :
+  deterministic step.
+Proof with eauto.
+  unfold deterministic.
+  intros.
+  generalize dependent y2.
+  induction H; intros; verify.
+(*
+  step_cases (induction H) Case; intros...; inv H0.
+  verify. verify. verify. verify.
+*)
+Qed.
+
 
 (* ###################################################################### *)
 (** *** Typing *)
@@ -1236,7 +1332,9 @@ Inductive has_type : context -> tm -> ty -> Prop :=
   | T_Unit : forall Gamma,
       Gamma |- tunit \in TUnit
   (* let *)
-(* FILL IN HERE *)
+  | T_Let : forall Gamma x t1 t2 T1 T2,
+      Gamma |- t1 \in T1 -> (extend Gamma x T1) |- t2 \in T2 ->
+      Gamma |- (tlet x t1 t2) \in T2
   (* sums *)
   | T_Inl : forall Gamma t1 T1 T2,
       Gamma |- t1 \in T1 ->
@@ -1262,10 +1360,11 @@ Inductive has_type : context -> tm -> ty -> Prop :=
       (extend (extend Gamma x2 (TList T1)) x1 T1) |- t3 \in T2 ->
       Gamma |- (tlcase t1 t2 x1 x2 t3) \in T2
   (* fix *)
-(* FILL IN HERE *)
-
+  | T_Fix : forall Gamma t T,
+      Gamma |- t \in (TArrow T T) ->
+      Gamma |- (tfix t) \in T
 where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
-
+                                
 Hint Constructors has_type.
 
 Tactic Notation "has_type_cases" tactic(first) ident(c) :=
@@ -1276,11 +1375,11 @@ Tactic Notation "has_type_cases" tactic(first) ident(c) :=
   | Case_aux c "T_Pair" | Case_aux c "T_Fst" | Case_aux c "T_Snd"
   | Case_aux c "T_Unit" 
 (* let *)
-(* FILL IN HERE *)
+  | Case_aux c "T_Let"
   | Case_aux c "T_Inl" | Case_aux c "T_Inr" | Case_aux c "T_Case"
   | Case_aux c "T_Nil" | Case_aux c "T_Cons" | Case_aux c "T_Lcase" 
 (* fix *)
-(* FILL IN HERE *)
+  | Case_aux c "T_Fix"
 ].
 
 (* ###################################################################### *)
@@ -1821,6 +1920,10 @@ Proof with eauto.
     left...
 (* let *)
 (* FILL IN HERE *)
+  Case "T_Let".
+    generalize (IHHt1); intro G; exploit G; auto; intro G2; inv G2.
+    right; eexists...
+    inv H. right; eexists...
   Case "T_Inl".
     destruct IHHt... 
     SCase "t1 steps". 
@@ -1868,7 +1971,10 @@ Proof with eauto.
       inversion H as [t1' Hstp].
       exists (tlcase t1' t2 x1 x2 t3)...
 (* fix *)
-(* FILL IN HERE *)
+  Case "T_Fix".
+    generalize (IHHt); intro G; exploit G; auto; intro G2; inv G2.
+    right; inv Ht; inv H; eexists...
+    inv H; right; eexists...
 Qed.
 
 (* ###################################################################### *)
@@ -1921,7 +2027,19 @@ Inductive appears_free_in : id -> tm -> Prop :=
       appears_free_in x t ->
       appears_free_in x (tsnd t)
   (* let *)
-(* FILL IN HERE *)
+  | afi_let1 : forall x var t1 t2,
+(*      x <> var -> *)
+      appears_free_in x t1 ->
+      appears_free_in x (tlet var t1 t2)
+  | afi_let2 : forall x var t1 t2,
+      x <> var -> 
+      appears_free_in x t2 ->
+      appears_free_in x (tlet var t1 t2)
+                      (*
+  | afi_let3 : forall x t1 t2,
+      appears_free_in x t2 ->
+      appears_free_in x (tlet x t1 t2)
+*)
   (* sums *)
   | afi_inl : forall x t T,
       appears_free_in x t ->
@@ -1959,7 +2077,9 @@ Inductive appears_free_in : id -> tm -> Prop :=
      appears_free_in x t3 ->
      appears_free_in x (tlcase t1 t2 y1 y2 t3)
   (* fix *)
-(* FILL IN HERE *)
+  | afi_fix : forall x t,
+     appears_free_in x t ->
+     appears_free_in x (tfix t)
   .
 
 Hint Constructors appears_free_in.
@@ -1970,7 +2090,7 @@ Lemma context_invariance : forall Gamma Gamma' t S,
      Gamma' |- t \in S.
 Proof with eauto.
   intros. generalize dependent Gamma'.
-  has_type_cases (induction H) Case; 
+  has_type_cases (induction H) Case;
     intros Gamma' Heqv...
   Case "T_Var".
     apply T_Var... rewrite <- Heqv...
@@ -1985,7 +2105,22 @@ Proof with eauto.
   Case "T_Pair". 
     apply T_Pair...
 (* let *)
-(* FILL IN HERE *)
+  Case "T_Let".
+    apply T_Let with T1... apply IHhas_type2... intros.
+    destruct (eq_id_dec x x0); subst. repeat rewrite extend_eq...
+    repeat rewrite extend_neq...
+    (*
+    apply T_Let with T1... apply IHhas_type1... intros. apply Heqv.
+    destruct (eq_id_dec x x0); subst.
+    apply afi_let3...
+    constructor.
+    
+    apply T_Let with (T1)...
+    apply IHhas_type2. intros.
+    destruct (eq_id_dec x x0).
+    subst. repeat rewrite extend_eq...
+    repeat rewrite extend_neq...
+*)
   Case "T_Case".
     eapply T_Case... 
      apply IHhas_type2. intros y Hafi.
@@ -2015,7 +2150,8 @@ Proof with eauto.
     unfold extend in Hctx. 
     rewrite neq_id in Hctx...
 (* let *)
-(* FILL IN HERE *)
+  Case "T_Let".
+    apply IHHtyp2 in H4. inv H4. rewrite extend_neq in H...
   Case "T_Case".
     SCase "left".
       destruct IHHtyp2 as [T' Hctx]... exists T'. 
@@ -2035,6 +2171,96 @@ Qed.
 (* ###################################################################### *)
 (** *** Substitution *)
 
+
+(*
+Tactic Notation "verify" :=
+  apply verification_correct;
+  repeat split;
+  simpl; unfold assert_implies;
+  unfold bassn in *; unfold beval in *; unfold aeval in *;
+  unfold assn_sub; intros;
+  repeat rewrite update_eq;
+  repeat (rewrite update_neq; [| (intro X; inversion X)]);
+  simpl in *;
+  repeat match goal with [H : _ /\ _ |- _] => destruct H end;
+  repeat rewrite not_true_iff_false in *;
+  repeat rewrite not_false_iff_true in *;
+  repeat rewrite negb_true_iff in *;
+  repeat rewrite negb_false_iff in *;
+  repeat rewrite beq_nat_true_iff in *;
+  repeat rewrite beq_nat_false_iff in *;
+  repeat rewrite ble_nat_true_iff in *;
+  repeat rewrite ble_nat_false_iff in *;
+  try subst;
+  repeat
+    match goal with
+      [st : state |- _] =>
+        match goal with
+          [H : st _ = _ |- _] => rewrite -> H in *; clear H
+        | [H : _ = st _ |- _] => rewrite <- H in *; clear H
+        end
+    end;
+  try eauto; try omega.
+*)
+(*
+Lemma extend_permute : forall t S Gamma x1 x2 T1 T2,
+  x1 <> x2 ->
+  extend (extend Gamma x1 T1) x2 T2 |- t \in S ->
+  extend (extend Gamma x2 T2) x1 T1 |- t \in S.
+Proof with eauto.
+Admitted.
+*)
+(*
+  H5 : extend (extend Gamma x U) i T1 |- t2 \in S
+  ============================
+   extend (extend Gamma i T1) x U |- t2 \in S
+update_permute:
+  forall (n1 n2 : nat) (x1 x2 x3 : id) (st : state),
+  x2 <> x1 ->
+  update (update st x2 n1) x1 n2 x3 = update (update st x1 n2) x2 n1 x3
+*)
+
+(*
+Lemma extend_shadow_type : forall t Gamma x T1 T2 S,
+  extend (extend Gamma x T1) x T2 |- t \in S ->
+  extend Gamma x T2 |- t \in S.
+*)
+(*
+Proof with eauto.
+  intro.
+  t_cases (induction t) Case; intros; try solve [inv H; eauto].
+  inv H. constructor. admit.
+  inv H. constructor. 
+  eapply IHt...
+
+
+  
+  intros.
+(*  remember (extend Gamma x T1) as GG. *)
+  remember (extend (extend Gamma x T1) x T2) as GGG.
+  has_type_cases (induction H) Case; inv HeqGGG; try solve [inv H; eauto].
+  constructor. rewrite extend_shadow in H...
+  constructor. admit. (* rewrite extend_shadow in H... *)
+  eapply T_Let... admit.
+  eapply T_Case... admit. admit.
+  eapply T_Lcase... admit.
+  
+  | T_Let : forall (Gamma : context) (x : id) (t1 t2 : tm) (T1 T2 : ty),
+            Gamma |- t1 \in T1 ->
+            extend Gamma x T1 |- t2 \in T2 -> Gamma |- tlet x t1 t2 \in T2  
+  inv H...
+  intros.
+  inv H.
+  inv H0; constructor. rewrite extend_shadow in *...
+  inv H0; constructor. constructor.
+  destruct (eq_id_dec x0 x1); subst. rewrite extend_eq in *...
+  rewrite extend_neq in *... rewrite extend_shadow in *...
+  constructor.
+  rewrite extend_shadow in *...
+Qed.
+*)
+
+  
 Lemma substitution_preserves_typing : forall Gamma x U v t S,
      (extend Gamma x U) |- t \in S  ->
      empty |- v \in U   ->
@@ -2113,7 +2339,29 @@ Proof with eauto.
       destruct (eq_id_dec y z)...
       subst. rewrite neq_id...
 (* let *)
-(* FILL IN HERE *)
+  Case "tlet".
+    destruct (eq_id_dec i x); subst.
+    eapply T_Let. apply IHt1... eapply context_invariance in H5. apply H5.
+    intros. destruct (eq_id_dec x x0); subst. repeat rewrite extend_eq...
+    repeat rewrite extend_neq...
+    
+    eapply T_Let.
+    apply IHt1. apply H4.
+    apply IHt2.
+    eapply context_invariance.
+    apply H5. intros.
+    destruct (eq_id_dec x0 i); destruct (eq_id_dec x0 x); repeat subst;
+    repeat rewrite extend_eq; eauto.
+    contradiction n...
+    (*
+    generalize H; intro.
+    apply free_in_context with (T:=S) (Gamma:=(extend (extend Gamma x U) x T1)) in H... inv H. rewrite extend_eq in H1. inv H1.
+    *)
+    rewrite extend_neq. rewrite extend_eq...
+    unfold not; intro; subst; auto.
+    rewrite extend_neq. rewrite extend_eq...
+    unfold not; intro; subst; auto.
+    repeat rewrite extend_neq...
   Case "tcase".
     rename i into x1. rename i0 into x2.
     eapply T_Case...
@@ -2209,7 +2457,8 @@ Proof with eauto.
   Case "T_Snd".
     inversion HT...
 (* let *)
-(* FILL IN HERE *)
+  Case "T_Let".
+    eapply substitution_preserves_typing... 
   Case "T_Case".
     SCase "ST_CaseInl".
       inversion HT1; subst. 
@@ -2223,7 +2472,9 @@ Proof with eauto.
       apply substitution_preserves_typing with (TList T1)...
       apply substitution_preserves_typing with T1...
 (* fix *)
-(* FILL IN HERE *)
+  Case "T_Fix".
+    eapply substitution_preserves_typing...
+    inv HT...
 Qed.
 (** [] *)
 
