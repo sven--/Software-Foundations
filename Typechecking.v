@@ -156,3 +156,4 @@ Qed.
 
 End STLCChecker.
 
+(* done! *)
