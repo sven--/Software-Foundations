@@ -2260,6 +2260,7 @@ Proof with eauto.
 Qed.
 *)
 
+SearchPattern (_ |- _ \in _).
   
 Lemma substitution_preserves_typing : forall Gamma x U v t S,
      (extend Gamma x U) |- t \in S  ->
@@ -2477,6 +2478,31 @@ Proof with eauto.
     inv HT...
 Qed.
 (** [] *)
+
+Definition stuck (t:tm) : Prop :=
+  (normal_form step) t /\ ~ value t.
+
+Corollary soundness : forall t t' T,
+  empty |- t \in T -> 
+  t ==>* t' ->
+  ~(stuck t').
+Proof.
+  intros t t' T Hhas_type Hmulti. unfold stuck.
+  intros [Hnf Hnot_val]. unfold normal_form in Hnf.
+  induction Hmulti.
+
+
+  unfold not in Hnf.
+  unfold not in Hnot_val.
+  apply progress in Hhas_type.
+  inv Hhas_type. apply Hnot_val in H. inv H.
+  apply Hnf in H. inv H.
+
+  generalize (preservation x y T Hhas_type H); intro.
+  apply IHHmulti in H0. inv H0.
+  assumption.
+  assumption.
+Qed.
 
 End STLCExtended.
 
