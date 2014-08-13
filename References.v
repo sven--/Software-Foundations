@@ -396,8 +396,7 @@ Definition tseq t1 t2 :=
     execution where the first two [let]s have finished and the third
     one is about to begin. *)
 
-(* FILL IN HERE *)
-(** [] *)
+(* c1.c = ref 0 / c2.c = ref 0 *)
 
 (* ################################### *)
 (** ** References to Compound Types *)
@@ -452,7 +451,7 @@ Definition tseq t1 t2 :=
 >>
 would it behave the same? *)
 
-(* FILL IN HERE *)
+(* I think so! *)
 (** [] *)
 
 (* ################################### *)
@@ -504,7 +503,7 @@ would it behave the same? *)
 (** **** Exercise: 1 star (type_safety_violation) *)
 (** Show how this can lead to a violation of type safety. *)
 
-(* FILL IN HERE *)
+(* Above example itself... *)
 (** [] *)
 
 (* ###################################################################### *)
@@ -864,6 +863,7 @@ Inductive step : tm * store -> tm * store -> Prop :=
          tassign v1 t2 / st ==> tassign v1 t2' / st'
 
 where "t1 '/' st1 '==>' t2 '/' st2" := (step (t1,st1) (t2,st2)).
+(* no need to define ST_NatPredSucc or ST_NatPredZero *)
 
 Tactic Notation "step_cases" tactic(first) ident(c) :=
   first;
@@ -965,7 +965,67 @@ Definition context := partial_map ty.
 (** Can you find a term whose evaluation will create this particular
     cyclic store? *)
 
-(** [] *)
+Module cyclic_store.
+Definition cyclic_store_program : tm :=
+  (tabs ExampleVariables.r TUnit (tnat 42)).
+Definition cyclic_store_fst : tm :=
+        (tref (tabs (Id 5) TNat (tapp (tderef (tloc 1)) (tvar (Id 5))))).
+Definition cyclic_store_snd : tm :=
+        (tref (tabs (Id 5) TNat (tapp (tderef (tloc 0)) (tvar (Id 5))))).
+Definition cyclic_store : tm :=
+  (tapp (tapp cyclic_store_program cyclic_store_fst)
+        cyclic_store_snd).
+End cyclic_store.
+
+(* Now, consider l < length st *)
+
+Definition cs_init_data : tm :=
+  (tref (tnat 0)).
+Definition cs_program : tm :=
+  (tabs ExampleVariables.r TUnit (tnat 42)).
+Definition cs_fst : tm :=
+  (tassign (tloc 0) (tabs (Id 5) TNat (tapp (tderef (tloc 1)) (tvar (Id 5))))).
+Definition cs_snd : tm :=
+  (tassign (tloc 0) (tabs (Id 5) TNat (tapp (tderef (tloc 1)) (tvar (Id 5))))).
+Definition cyclic_store : tm :=
+  (tseq cs_init_data (tseq cs_init_data
+                           (tseq cs_fst
+                                 (tseq cs_snd
+                                 (tseq cs_init_data cs_program))))).
+(*  (tapp (tapp (tapp (tapp cs_init_program cs_init_data)
+              cs_init_data)
+        cs_fst)
+        cs_snd).
+*)
+
+(*
+  | ST_RefValue : forall (v1 : tm) (st : store),
+                  value v1 -> tref v1 / st ==> tloc (length st) / snoc st v1
+  | ST_Assign : forall (v2 : tm) (l : nat) (st : list tm),
+                value v2 ->
+                l < length st ->
+                tassign (tloc l) v2 / st ==> tunit / replace l v2 st
+  | ST_DerefLoc : forall (st : list tm) (l : nat),
+                  l < length st ->
+                  tderef (tloc l) / st ==> store_lookup l st / st
+Inductive value : tm -> Prop :=
+    v_abs : forall (x : id) (T : ty) (t : tm), value (tabs x T t)
+  | v_nat : forall n : nat, value (tnat n)
+  | v_unit : value tunit
+  | v_loc : forall l : nat, value (tloc l)
+
+       r:=succ(!r); !r
+>>
+    as an abbreviation for 
+<<
+       (\x:Unit. !r) (r := succ(!r)).
+*)
+(*
+   [\x:Nat. (!(loc 1)) x, \x:Nat. (!(loc 0)) x]
+
+(tref \x:Nat. (!(loc 1)))
+(tref \x:Nat. (!(loc 0)))
+*)                    
 
 (** Both of these problems arise from the fact that our proposed
     typing rule for locations requires us to recalculate the type of a
@@ -1182,18 +1242,117 @@ Definition store_well_typed (ST:store_ty) (st:store) :=
     different store typings [ST1] and [ST2] such that both
     [ST1 |- st] and [ST2 |- st]? *)
 
-(* FILL IN HERE *)
+(* Different gamma value? *)
 (** [] *)
 
 (** We can now state something closer to the desired preservation
     property: *)
+Lemma modusponens: forall (P Q: Prop), P -> (P -> Q) -> Q.
+Proof. auto. Qed.
+Ltac exploit x :=
+    refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _) _)
+ || refine (modusponens _ _ (x _ _) _)
+ || refine (modusponens _ _ (x _) _).
 
+(*
 Theorem preservation_wrong2 : forall ST T t st t' st', 
   empty; ST |- t \in T ->
   t / st ==> t' / st' ->
   store_well_typed ST st ->
   empty; ST |- t' \in T.
 Abort.
+*)
+
+Ltac inv H := inversion H; subst; clear H.
+
+Theorem preservation_wrong2 : ~(forall ST T t st t' st', 
+  empty; ST |- t \in T ->
+  t / st ==> t' / st' ->
+  store_well_typed ST st ->
+  empty; ST |- t' \in T).
+Proof with eauto.
+  unfold not; intros.
+  generalize (H [TUnit] TUnit
+                (tseq 
+                      (tassign (tref (tnat 5)) (tnat 0))
+                      (tderef (tloc 0)))
+                [tunit]
+                ); intro T; exploit T; unfold tseq; eauto.
+  eapply T_App. constructor. constructor. constructor. constructor.
+  eapply T_Assign. constructor. constructor.
+  constructor. 
+  constructor. auto.
+  intros. unfold store_lookup. simpl. destruct l; auto. destruct l; auto.
+
+  intro. inv H0. inv H5. inv H3. inv H4. inv H3. inv H7. inv H4. inv H6. inv H1. inv H1.
+Qed.
+(*
+  | T_Loc : forall Gamma ST l,
+      l < length ST ->
+      Gamma; ST |- (tloc l) \in (TRef (store_Tlookup l ST))
+  | T_Ref : forall Gamma ST t1 T1,
+      Gamma; ST |- t1 \in T1 ->
+      Gamma; ST |- (tref t1) \in (TRef T1)
+  | T_Deref : forall Gamma ST t1 T11,
+      Gamma; ST |- t1 \in (TRef T11) ->
+      Gamma; ST |- (tderef t1) \in T11
+  | T_Assign : forall Gamma ST t1 t2 T11,
+      Gamma; ST |- t1 \in (TRef T11) ->
+      Gamma; ST |- t2 \in T11 ->
+      Gamma; ST |- (tassign t1 t2) \in TUnit
+
+  | ST_RefValue : forall (v1 : tm) (st : store),
+                  value v1 -> tref v1 / st ==> tloc (length st) / snoc st v1
+  | ST_Ref : forall (t1 t1' : tm) (st st' : store),
+             t1 / st ==> t1' / st' -> tref t1 / st ==> tref t1' / st'
+  | ST_DerefLoc : forall (st : list tm) (l : nat),
+                  l < length st ->
+                  tderef (tloc l) / st ==> store_lookup l st / st
+  | ST_Deref : forall (t1 t1' : tm) (st st' : store),
+               t1 / st ==> t1' / st' -> tderef t1 / st ==> tderef t1' / st'
+  | ST_Assign : forall (v2 : tm) (l : nat) (st : list tm),
+                value v2 ->
+                l < length st ->
+                tassign (tloc l) v2 / st ==> tunit / replace l v2 st
+  | ST_Assign1 : forall (t1 t1' t2 : tm) (st st' : store),
+                 t1 / st ==> t1' / st' ->
+                 tassign t1 t2 / st ==> tassign t1' t2 / st'
+  | ST_Assign2 : forall (v1 t2 t2' : tm) (st st' : store),
+                 value v1 ->
+                 t2 / st ==> t2' / st' ->
+                 tassign v1 t2 / st ==> tassign v1 t2' / st'                       *)
 
 (** This statement is fine for all of the evaluation rules except the
     allocation rule [ST_RefValue].  The problem is that this rule
@@ -1547,15 +1706,18 @@ Qed.
 (** Now that we've got everything set up right, the proof of
     preservation is actually quite straightforward. *)
 
-Theorem preservation : forall ST t t' T st st',
+Theorem preservation : 
+  preservation_theorem.
+                         (*
   empty; ST |- t \in T ->
   store_well_typed ST st ->
   t / st ==> t' / st' ->
   exists ST',
     (extends ST' ST /\ 
      empty; ST' |- t' \in T /\
-     store_well_typed ST' st').
+     store_well_typed ST' st').*)
 Proof with eauto using store_weakening, extends_refl.
+  unfold preservation_theorem.
     remember (@empty ty) as Gamma.
   intros ST t t' T st st' Ht.
   generalize dependent t'.
@@ -1641,12 +1803,147 @@ Proof with eauto using store_weakening, extends_refl.
       exists ST'...
 Qed.
 
+Theorem preservation_ : 
+  preservation_theorem.
+Proof with eauto using store_weakening, extends_refl.
+  unfold preservation_theorem. remember empty as Gamma.
+  intros.
+  generalize dependent t'.
+  generalize dependent H0.
+  has_type_cases (induction H) Case;
+    intros HST t' Hstep; try (solve by inversion);
+    inv Hstep; eauto using store_weakening, extends_refl.
+
+
+  Case "T_App".
+    eexists... split... split...
+    eapply substitution_preserves_typing...
+    inv H...
+
+    eapply IHhas_type1 in HST... inv HST. inv H1. inv H4.
+
+    eexists; eauto using store_weakening, extends_refl.
+
+    eapply IHhas_type2 in HST... inv HST. inv H1. inv H4.
+    eexists...
+
+  Case "T_Succ".
+    eapply IHhas_type in H1...
+    inv H1. inv H0. inv H2.
+    eexists... 
+    
+  Case "T_Pred".
+    eapply IHhas_type in H1...
+    inv H1. inv H0. inv H2.
+    eexists...
+  Case "T_Mult".
+    apply IHhas_type1 with (t1') in HST...
+    inv HST. inv H1. inv H4.
+    eexists...
+
+    apply IHhas_type2 with (t2') in H7...
+    inv H7. inv H1. inv H4.
+    eexists...
+
+  Case "T_If0".
+    eapply IHhas_type1 in HST...
+    inv HST. inv H2. inv H5.
+    eexists...
+    split...
+
+  Case "T_Ref".
+    generalize HST; intro.
+    unfold store_well_typed in HST0. inv HST0...
+    (*
+    eapply IHhas_type in HST.
+    inv HST. inv H3. inv H5.
+*)
+
+    exists (snoc ST T1). split... apply extends_snoc.
+    split...
+    replace (TRef T1) with (TRef (store_Tlookup (length st) (snoc ST T1)))...
+    constructor...
+    rewrite length_snoc. rewrite H0. omega.
+    unfold store_Tlookup. rewrite <- H0.
+    rewrite nth_eq_snoc...
+    apply store_well_typed_snoc...
+
+    apply IHhas_type in H1. inv H1. inv H0. inv H2.    
+    exists x... split... auto. 
+
+  Case "T_Deref".
+    exists ST. split... split...
+    replace T11 with (store_Tlookup l ST)...
+    inv HST. apply H2...
+
+    unfold store_Tlookup. inv H...
+
+    apply IHhas_type in H1... inv H1. inv H0. inv H2.
+    unfold store_well_typed in HST... 
+
+  Case "T_Assign".
+    exists ST... split... split...
+    apply assign_pres_store_typing...
+
+    replace (store_Tlookup l ST) with T11...
+    inv H...
+    
+    apply IHhas_type1 in H2... inv H2. inv H1. inv H3.
+    exists x... 
+    apply IHhas_type2 in H7... inv H7. inv H1. inv H4.
+    exists x...
+Qed.    
+
 (** **** Exercise: 3 stars (preservation_informal) *)
 (** Write a careful informal proof of the preservation theorem,
     concentrating on the [T_App], [T_Deref], [T_Assign], and [T_Ref]
     cases. 
 
-(* FILL IN HERE *)
+
+  (H)empty; ST |- t \in T ->
+  (HST)store_well_typed ST st ->
+  (Hstep)t / st ==> t' / st' ->
+  exists ST',
+    (extends ST' ST /\ 
+     empty; ST' |- t' \in T /\
+     store_well_typed ST' st').
+
+
+Keep store_weakening and extends_refl lemma in mind.
+Induction on H : "empty; ST |- t \in T".
+It has "has_type" inductive type.
+Consider every case that H can occur, each with its own premises.
+Many cases are solved just by looking simpl reasoning,
+in specific, considering each possible cases of Hstep.
+(*
+  has_type_cases (induction H) Case;
+    intros HST t' Hstep; try (solve by inversion);
+    inv Hstep; eauto using store_weakening, extends_refl.
+*)
+
+Now, focus on more interesting cases.
+"T_Ref".
+  Gamma; ST |- t1 \in T1 ->
+  (H) Gamma; ST |- tref t1 \in TRef T1
+
+  where, original H was in form of
+  (H)empty; ST |- t \in T, means t := tref t1 for some t1.
+
+  Look at Hstep. Only possible cases with (t := tref t1) is
+  ST_RefValue and ST_Ref, stated below.
+
+  | ST_RefValue : forall (v1 : tm) (st : store),
+                  value v1 -> tref v1 / st ==> tloc (length st) / snoc st v1
+  | ST_Ref : t1 / st ==> t1' / st' -> tref t1 / st ==> tref t1' / st'
+
+  For each case, now goal is to prove this.
+  exists ST' : store_ty,
+  extends ST' ST /\ \empty; ST' |- t' \in T /\ store_well_typed ST' st'
+     : Prop
+  | ST_RefValue -> exists (snoc ST T1)
+  | ST_Ref -> exists ST
+
+  Similary...
 [] *)
 
 
@@ -1792,11 +2089,23 @@ Definition loop :=
     (tseq (tassign (tvar r) loop_fun)
             (tapp (tderef (tvar r)) tunit)))
   (tref (tabs x TUnit tunit)).
+Definition loop' :=
+  tseq (tref (tabs x TUnit tunit))
+  (tabs r (TRef (TArrow TUnit TUnit))
+    (tseq (tassign (tvar r) loop_fun)
+            (tapp (tderef (tvar r)) tunit))).
 
 (** This term is well typed: *)
 
 Lemma loop_typeable : exists T, empty; nil |- loop \in T.
 Proof with eauto.
+  exists TUnit. (* eexists *)
+  unfold loop. unfold loop_fun.
+  (* repeat econstructor *)
+  apply T_App with (TRef (TArrow TUnit TUnit)).
+  repeat econstructor.
+  apply T_Ref. apply T_Abs. apply T_Unit.
+  (*
   eexists. unfold loop. unfold loop_fun.
   eapply T_App...
   eapply T_Abs...
@@ -1808,8 +2117,13 @@ Proof with eauto.
   eapply T_Abs. 
     eapply T_App... 
       eapply T_Deref. eapply T_Var. reflexivity.
+*)
 Qed.
-
+Lemma loop'_not_typeable : ~(exists T, empty; nil |- loop' \in T).
+Proof with eauto.
+  unfold not; intro.
+  inv H. inv H0. inv H6. inv H2. inv H7. inv H4.
+Qed.
 (** To show formally that the term diverges, we first define the
     [step_closure] of the single-step reduction relation, written
     [==>+].  This is just like the reflexive step closure of
@@ -1840,6 +2154,8 @@ Notation "t1 '/' st '==>+' t2 '/' st'" := (multistep1 (t1,st) (t2,st'))
     doesn't normalize, so the old [normalize] tactic would just go
     into an infinite loop reducing it forever! *)
 
+
+
 Ltac print_goal := match goal with |- ?x => idtac x end.
 Ltac reduce := 
     repeat (print_goal; eapply multi_step ; 
@@ -1865,6 +2181,14 @@ Proof with eauto.
   eapply sc_one. compute. apply ST_AppAbs...
 Qed.
 
+Lemma cyclic_store_not_typeable : forall T, ~(empty; nil |- cyclic_store \in T).
+Proof with eauto.
+  intros.
+  unfold cyclic_store. unfold cs_init_data, cs_fst, cs_snd, cs_program, not.
+  intros.
+  inv H. inv H4. inv H2. inv H7. inv H2. inv H6.
+Qed.
+
 (** **** Exercise: 4 stars (factorial_ref) *)
 (** Use the above ideas to implement a factorial function in STLC with
     references.  (There is no need to prove formally that it really
@@ -1872,24 +2196,173 @@ Qed.
     sure it gives the correct result when applied to the argument
     [4].) *)
 
+Definition five_to_six : tm :=
+  tapp
+    (tabs r (TRef TNat) (tsucc (tderef (tvar r))))
+    (tref (tnat 5)).
+Lemma five_to_six_test : exists st, 
+  five_to_six / nil ==>* tnat 6 / st.
+Proof. eexists. unfold five_to_six. reduce. Qed.  
+Lemma five_to_six_type :
+  empty; nil |- five_to_six \in TNat.
+Proof. repeat econstructor. Qed.
+
+Definition minus_one : tm :=
+  (tabs r (TNat) (tpred (tvar r))).
+Lemma minus_one_test :
+  (exists st, 
+  (tapp minus_one (tnat 5)) / nil ==>* tnat 4 / st) /\
+  (exists st,
+  (tapp minus_one (tnat 0)) / nil ==>* tnat 0 / st) /\
+  (exists st,
+  (tseq
+     (tref minus_one)
+     (tnat 0)
+  ) / nil ==>* tnat 0 / st) /\
+  (exists st,
+  (tseq
+     (tref minus_one)
+     (tapp (tderef (tloc 0)) (tnat 5))
+  ) / nil ==>* tnat 4 / st)  
+.
+Proof. repeat split; eexists; unfold minus_one, tseq, not; reduce.
+Qed.
+Lemma minus_one_type :
+  empty; nil |- minus_one \in (TArrow TNat TNat).
+Proof. repeat econstructor. Qed.      
+(*  
+Definition loop_fun :=
+  tabs x TUnit (tapp (tderef (tvar r)) tunit).
+
+Definition loop :=
+  tapp
+  (tabs r (TRef (TArrow TUnit TUnit))
+    (tseq (tassign (tvar r) loop_fun)
+            (tapp (tderef (tvar r)) tunit)))
+  (tref (tabs x TUnit tunit)).
+*)
+
+Definition minus_one_without_program_arg :=
+  (*
+  (tseq
+        (* (tassign (tvar t) minus_one) *)
+        (tref minus_one)
+        (tapp (tderef (tvar (Id 0))) (tnat 10))).
+*)
+  (* tseq : t1 should be TUnit, but tref is not TUnit *)
+tapp
+  (tabs r (TRef (TArrow TNat TNat))
+        (tapp (tderef (tvar (Id 2))) (tnat 10)))
+  (tref minus_one).
+
+Lemma minus_one_without_program_arg_type :
+  empty; nil |- minus_one_without_program_arg \in TNat.
+Proof.
+  repeat econstructor.
+  (*
+  unfold minus_one_without_param, tseq.
+  apply T_App with (TRef (TArrow TNat TNat)).
+  repeat econstructor.
+
+  apply preservation_theorem.
+  apply T_Assign.
+
+
+                                           
+  repeat econstructor; unfold t, extend; simpl.
+Qed.
+*)
+Qed.
+
+
+(*
+x : tseq
+    ?
+y : param for program,4 -> 24
+    TNat
+r : factorial_fun
+    TArrow TNat TNat
+s : param for factorial_fun
+    TNat
+*)
+
+Definition program_arg := Id 14.
+Definition function_address := Id 13.
+Definition function_arg := Id 12.
+(* Definition not_used := Id 11. (* for sequencing *) *)
+Definition tseq_var := Id 10.
+Definition function_param := Id 9.
+
+Definition tseq' t1 t2 := 
+  tapp (tabs tseq_var TUnit t2) t1.
+
+Definition factorial_fun : tm :=
+(*  minus_one. *)
+(*  tabs function_param TNat (tpred (tvar function_param)). *)
+  tabs function_param TNat
+       (tif0 (tvar function_param)
+             (tnat 1)
+             (tmult
+                (tvar function_param)
+(*                (tapp (tderef (tvar function_address)) (tpred (tvar function_param))) *)
+                (tapp (tderef (tvar function_address)) (tpred (tvar function_param)))
+             )
+       ).
+                
+
+Definition factorial_without_program_arg : tm :=
+    tapp 
+      (tabs function_address (TRef (TArrow TNat TNat))
+        (tseq' (tassign (tvar function_address) factorial_fun)
+              (tapp (tderef (tvar function_address)) (tnat 10))))
+      (tref (tabs function_arg TNat (tnat 42)))
+(* initialize loc 0's type with, TRef Nat -> Nat *)
+    .
+
+(* tseq uses (Id 0), which is ExampleVariables.x 
+tseq = fun t1 t2 : tm => tapp (tabs (Id 0) TUnit t2) t1
+     : tm -> tm -> tm
+*)
+
+Lemma factorial_without_param_type :
+  empty; nil |- factorial_without_program_arg \in TNat.
+Proof with eauto.
+  unfold factorial_without_program_arg, tseq, x, y, r, s.
+  repeat econstructor; try reduce; try eauto; try unfold extend; try simpl. 
+Qed.
+
 Definition factorial : tm :=
-  (* FILL IN HERE *) admit.
+  (tabs program_arg TNat
+    (tapp
+      (tabs function_address (TRef (TArrow TNat TNat))
+        (tseq (tassign (tvar function_address) factorial_fun)
+              (tapp (tderef (tvar function_address)) (tvar program_arg))))
+      (tref (tabs function_param TNat (tnat 42)))))
+    .
 
 Lemma factorial_type : empty; nil |- factorial \in (TArrow TNat TNat).
 Proof with eauto.
-  (* FILL IN HERE *) Admitted.
-
+  unfold factorial, tseq, x, y, r, s; reduce...
+  repeat try (econstructor); unfold extend;
+  unfold x; unfold y; unfold r; unfold s;
+  simpl; eauto.
+Qed.
 (** If your definition is correct, you should be able to just
     uncomment the example below; the proof should be fully
     automatic using the [reduce] tactic. *)
 
-(* 
+Lemma factorial_6 : exists st, 
+  tapp factorial (tnat 6) / nil ==>* tnat 720 / st.
+Proof.
+  eexists. unfold factorial. reduce.
+Qed.
+
 Lemma factorial_4 : exists st, 
   tapp factorial (tnat 4) / nil ==>* tnat 24 / st.
 Proof.
   eexists. unfold factorial. reduce.
 Qed.
-*)
+
 (** [] *)
 
 (* ################################### *)
