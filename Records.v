@@ -177,6 +177,7 @@ Inductive record_ty : ty -> Prop :=
   | RTnil : 
         record_ty TRNil
   | RTcons : forall i T1 T2,
+(*        record_ty T2 -> *)
         record_ty (TRCons i T1 T2).
 
 (** Similarly, a term is a record term if it is built with [trnil]
@@ -186,6 +187,7 @@ Inductive record_tm : tm -> Prop :=
   | rtnil :
         record_tm trnil
   | rtcons : forall i t1 t2,
+(*        record_tm t2 -> *)
         record_tm (trcons i t1 t2).
 
 (** Note that [record_ty] and [record_tm] are not recursive -- they
@@ -264,6 +266,8 @@ Fixpoint tlookup (i:id) (tr:tm) : option tm :=
   | trcons i' t tr' => if eq_id_dec i i' then Some t else tlookup i tr'
   | _ => None
   end.
+
+(* ID uniqueness??? *)
 
 (** The [step] function uses the term-level lookup function (for the
     projection rule), while the type-level lookup is needed for
@@ -401,8 +405,9 @@ Lemma typing_example_2 :
             (trcons i2 (tabs a B (tvar a))
              trnil))) \in
     (TArrow B B).
-Proof. 
-  (* FILL IN HERE *) Admitted.
+Proof with eauto.
+  repeat econstructor...
+Qed.
 
 (** Before starting to prove this fact (or the one above!), make sure
     you understand what it is saying. *)
@@ -413,8 +418,11 @@ Example typing_nonexample :
                                 TRNil)) |-
                (trcons i1 (tabs a B (tvar a)) (tvar a)) \in
                T.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with eauto.
+  unfold not; intro.
+  inv H. inv H0. inv H3. inv H5. inv H9. inv H0. inv H1. inv H8.
+Qed.
+    
 
 Example typing_nonexample_2 : forall y,
   ~ exists T,
@@ -424,7 +432,10 @@ Example typing_nonexample_2 : forall y,
                    (trcons i1 (tvar y) (trcons i2 (tvar y) trnil))) \in
            T.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  unfold not; intros.
+  inv H. inv H0. inv H3. inv H5. inv H8. inv H2. inv H3. inv H0. inv H5.
+  inv H2. inv H11. inv H7. inv H9.
+Qed.
 
 (* ###################################################################### *)
 (** ** Properties of Typing *)
