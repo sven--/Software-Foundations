@@ -91,15 +91,28 @@ Proof.
 (** Show that the [total_relation] defined in Logic.v is not a partial
     function. *)
 
-(* FILL IN HERE *)
-(** [] *)
+Theorem total_relation_is_not_partial :
+  ~(partial_function total_relation).
+Proof with eauto.
+  unfold not. 
+  intros.
+  assert(0 = 1) as Nonsense.
+  apply H with (x := 0);
+  constructor...
+  inversion Nonsense.
+Qed.
 
 (** **** Exercise: 2 stars, optional *)
 (** Show that the [empty_relation] defined in Logic.v is a partial
     function. *)
 
-(* FILL IN HERE *)
-(** [] *)
+Theorem empty_relation_is_partial :
+  (partial_function empty_relation).
+Proof.
+  unfold partial_function.
+  intros.
+  inversion H...
+Qed.
 
 (** A _reflexive_ relation on a set [X] is one for which every element
     of [X] is related to itself. *)
@@ -142,12 +155,13 @@ Proof.
 
 Theorem lt_trans' :
   transitive lt.
-Proof.
+Proof with eauto.
   (* Prove this by induction on evidence that [m] is less than [o]. *)
   unfold lt. unfold transitive.
   intros n m o Hnm Hmo.
-  induction Hmo as [| m' Hm'o].
-    (* FILL IN HERE *) Admitted.
+  induction Hmo as [| m' Hm'o]...
+Qed.
+  
 (** [] *)
 
 (** **** Exercise: 2 stars, optional *)
@@ -155,11 +169,16 @@ Proof.
 
 Theorem lt_trans'' :
   transitive lt.
-Proof.
+Proof with eauto.
   unfold lt. unfold transitive.
   intros n m o Hnm Hmo.
-  induction o as [| o'].
-  (* FILL IN HERE *) Admitted.
+  induction o as [| o']...
+  inversion Hmo...
+  assert(G : S n <= S m).
+  apply le_S...
+  eapply le_trans in G...
+Qed.
+
 (** [] *)
 
 (** The transitivity of [le], in turn, can be used to prove some facts
@@ -176,7 +195,16 @@ Proof.
 Theorem le_S_n : forall n m,
   (S n <= S m) -> (n <= m).
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  generalize dependent m.
+  induction n; intros.
+  apply le_0_n.
+  inversion H; subst; simpl;
+  try constructor...
+  apply le_Sn_le in H1...
+  apply H1.
+Qed.
+
 (** [] *)
 
 (** **** Exercise: 2 stars, optional (le_Sn_n_inf) *)
@@ -195,8 +223,14 @@ Proof.
 (** **** Exercise: 1 star, optional *)
 Theorem le_Sn_n : forall n,
   ~ (S n <= n).
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with eauto.
+  unfold not.
+  intros.
+  induction n. inversion H.
+  inversion H. apply IHn. rewrite H1...
+  apply le_Sn_le in H1.
+  apply IHn...
+Qed.
 (** [] *)
 
 (** Reflexivity and transitivity are the main concepts we'll need for
@@ -208,11 +242,57 @@ Proof.
 Definition symmetric {X: Type} (R: relation X) :=
   forall a b : X, (R a b) -> (R b a).
 
+Lemma modusponens: forall (P Q: Prop), P -> (P -> Q) -> Q.
+Proof. auto. Qed.
+
+Ltac exploit x :=
+    refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _ _) _)
+ || refine (modusponens _ _ (x _ _ _) _)
+ || refine (modusponens _ _ (x _ _) _)
+ || refine (modusponens _ _ (x _) _).
+
+Ltac inv H := inversion H; clear H; subst.
+
 (** **** Exercise: 2 stars, optional *)
 Theorem le_not_symmetric :
   ~ (symmetric le).
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with eauto.
+  unfold symmetric, not.
+  intros.
+  generalize (H 0 1); intro T; exploit T...
+  intro. inv H0.
+Qed.
 (** [] *)
 
 (** A relation [R] is _antisymmetric_ if [R a b] and [R b a] together
@@ -225,8 +305,15 @@ Definition antisymmetric {X: Type} (R: relation X) :=
 (** **** Exercise: 2 stars, optional *)
 Theorem le_antisymmetric :
   antisymmetric le.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with eauto.
+  unfold antisymmetric.
+  intros.
+  inv H...
+  eapply le_trans in H0.
+  apply H0 in H1.
+  apply le_Sn_n in H1...
+  inv H1.
+Qed.
 (** [] *)
 
 (** **** Exercise: 2 stars, optional *)
@@ -234,8 +321,14 @@ Theorem le_step : forall n m p,
   n < m ->
   m <= S p ->
   n <= p.
-Proof. 
-  (* FILL IN HERE *) Admitted.
+Proof with eauto.
+  intro.
+  induction n; intros.
+  apply le_0_n.
+  assert(G : S n < S p). eapply lt_le_trans...
+  apply lt_le_S in G.
+  apply le_S_n in G...
+Qed.
 (** [] *)
 
 (** A relation is an _equivalence_ if it's reflexive, symmetric, and
@@ -287,7 +380,15 @@ Inductive clos_refl_trans {A: Type} (R: relation A) : relation A :=
 
 Theorem next_nat_closure_is_le : forall n m,
   (n <= m) <-> ((clos_refl_trans next_nat) n m).
-Proof.
+Proof with eauto.
+  (*
+  intros. split; intros.
+  induction H... apply rt_refl...
+  eapply rt_trans... apply rt_step... constructor...
+  induction H...
+  inv H...
+  omega.
+  *)
   intros n m. split.
     Case "->".
       intro H. induction H.
@@ -355,14 +456,46 @@ Proof.
   intros X R x y H.
   apply rsc_step with y. apply H. apply rsc_refl.   Qed.
 
+Lemma lem1 : forall (X:Type) (R:relation X) (x y:X),
+  refl_step_closure R x y ->
+  (exists a, (R x a /\ refl_step_closure R a y)) \/ x = y.
+Proof with eauto.
+  intros.
+  inv H...
+Qed.
+
+(*
+Lemma lem2 : forall (X:Type) (R:relation X) (x y:X),
+  refl_step_closure R x y ->
+  (exists a, (refl_step_closure R x a /\ R a y)) \/ x = y.
+Proof with eauto.
+  intros.
+  induction H...
+  inv IHrefl_step_closure...
+  inv H1... inv H2...
+  left. exists y. split... apply (rsc_R X R x y) in H...
+  
+Qed.
+*)
+
 (** **** Exercise: 2 stars, optional (rsc_trans) *)
 Theorem rsc_trans :
   forall (X:Type) (R: relation X) (x y z : X),
       refl_step_closure R x y  ->
       refl_step_closure R y z ->
       refl_step_closure R x z.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with eauto.
+  intros.
+  induction H...
+  econstructor...
+(*
+  intros.
+  apply lem1 in H.
+  inv H...
+  inv H1. inv H.
+  econstructor...
+*)
+Qed.
 (** [] *)
 
 (** Then we use these facts to prove that the two definitions of
@@ -373,7 +506,18 @@ Proof.
 Theorem rtc_rsc_coincide : 
          forall (X:Type) (R: relation X) (x y : X),
   clos_refl_trans R x y <-> refl_step_closure R x y.
-Proof.
-  (* FILL IN HERE *) Admitted.
+Proof with eauto.
+  intros.
+  split; intros.
+  induction H...
+  apply rsc_R...
+  constructor...
+  eapply rsc_trans...
+
+  induction H...
+  apply rt_refl...
+  eapply rt_trans...
+  econstructor...
+Qed.
 (** [] *)
 
