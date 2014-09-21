@@ -93,8 +93,17 @@ Print eight_is_beautiful.
 (** In view of this, we might wonder whether we can write such
     an expression ourselves. Indeed, we can: *)
 
-Check (b_sum 3 5 b_3 b_5).  
+Check (b_sum 3 5 b_3 b_5).
+
 (* ===> beautiful (3 + 5) *)
+
+Theorem b_11 : beautiful 11.
+Proof. apply b_sum with (n:=8) (m:=3).
+       apply eight_is_beautiful.
+       apply b_3. Qed.
+
+Check (b_sum 8 3 eight_is_beautiful b_3).
+Check b_11.
 
 (** The expression [b_sum 3 5 b_3 b_5] can be thought of as
     instantiating the parameterized constructor [b_sum] with the
@@ -186,10 +195,12 @@ Print eight_is_beautiful'''.
 Theorem six_is_beautiful :
   beautiful 6.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  apply (b_sum 3 3); constructor.
+Qed.
 
 Definition six_is_beautiful' : beautiful 6 :=
-  (* FILL IN HERE *) admit.
+  b_sum 3 3 b_3 b_3.
+
 (** [] *)
 
 (** **** Exercise: 1 star (nine_is_beautiful) *)
@@ -198,10 +209,15 @@ Definition six_is_beautiful' : beautiful 6 :=
 Theorem nine_is_beautiful :
   beautiful 9.
 Proof.
-  (* FILL IN HERE *) Admitted.
+  apply (b_sum 6 3).
+  apply six_is_beautiful'.
+  constructor.
+Qed.
 
 Definition nine_is_beautiful' : beautiful 9 :=
-  (* FILL IN HERE *) admit.
+  (b_sum 6 3 six_is_beautiful b_3).
+(*  (b_sum 6 3 six_is_beautiful' b_3). *)
+
 (** [] *)
 
 (* ##################################################### *)
@@ -233,6 +249,18 @@ Qed.
     takes two arguments (one number and a piece of evidence) and
     returns a piece of evidence!  Here it is: *)
 
+Theorem my_1 : forall n, forall _ : beautiful n, beautiful (3+n).
+Proof with eauto. intros. apply (b_sum 3 n b_3 H). Qed.
+Theorem my_2 : forall n, beautiful n -> beautiful (3+n).
+Proof with eauto. intros. apply (b_sum 3 n b_3 H). Qed.
+Definition my_3 : forall n, beautiful n -> beautiful (3+n) := 
+  fun (n : nat) => fun (H : beautiful n) =>
+    b_sum 3 n b_3 H.
+Definition my_4 : forall n, forall _ : beautiful n, beautiful (3+n) := 
+  fun (n : nat) => fun (H : beautiful n) =>
+    b_sum 3 n b_3 H.
+
+
 Definition b_plus3' : forall n, beautiful n -> beautiful (3+n) := 
   fun (n : nat) => fun (H : beautiful n) =>
     b_sum 3 n b_3 H.
@@ -260,7 +288,7 @@ Check b_plus3''.
     correspond to functions on evidence.  In fact, they are really the
     same thing: [->] is just a shorthand for a degenerate use of
     [forall] where there is no dependency, i.e., no need to give a name
-    to the type on the LHS of the arrow. *)                                           
+    to the type on the LHS of the arrow. *)
 
 (** For example, consider this proposition: *)
 
@@ -280,8 +308,12 @@ Definition beautiful_plus3' : Prop :=
 
 (** Or, equivalently, we can write it in more familiar notation: *)
 
-Definition beatiful_plus3'' : Prop :=
+Definition beautiful_plus3'' : Prop :=
   forall n, beautiful n -> beautiful (n+3). 
+
+Print beautiful_plus3.
+Print beautiful_plus3'.
+Print beautiful_plus3''.
 
 (** In general, "[P -> Q]" is just syntactic sugar for
     "[forall (_:P), Q]". *)
@@ -291,8 +323,32 @@ Definition beatiful_plus3'' : Prop :=
 
 (** Give a proof object corresponding to the theorem [b_times2] from Prop.v *)
 
+Require Import Omega.
+
+Lemma mult_to_add : forall n, 2*n = n+n.
+Proof. intros. omega. Qed.
+Theorem b_times2'_thm: forall n, beautiful n -> beautiful (2*n).
+Proof.
+  intros.
+  rewrite mult_to_add.
+  apply (b_sum n n H H).
+(*  
+  intros.
+  replace (2*n) with (n+n).
+  apply (b_sum n n H H).
+  omega.
+*)
+Qed.
+
+
+Definition b_times2'_: forall n, beautiful n -> beautiful (n+n) :=
+  fun (n : nat) => fun (E : beautiful n) => (b_sum n n E E).
+
 Definition b_times2': forall n, beautiful n -> beautiful (2*n) :=
-  (* FILL IN HERE *) admit.
+  fun (n : nat) => fun (E : beautiful n) => (b_times2 n E).
+
+Definition b_times2'__: forall n, forall (E : beautiful n), beautiful (2*n) :=
+  fun (n : nat) => fun (EE : beautiful n) => (b_times2 n EE).
 (** [] *)
 
 
@@ -301,7 +357,8 @@ Definition b_times2': forall n, beautiful n -> beautiful (2*n) :=
 (** Give a proof object corresponding to the theorem [gorgeous_plus13] from Prop.v *)
 
 Definition gorgeous_plus13_po: forall n, gorgeous n -> gorgeous (13+n):=
-   (* FILL IN HERE *) admit.
+  fun (n : nat) => fun (E : gorgeous n) =>
+  (g_plus3 (10+n) (g_plus5 (5+n) (g_plus5 n E))).
 (** [] *)
 
 
@@ -334,6 +391,20 @@ Print and_example.
     you guess the proof object will look like if we uncomment them?
     Try it and see. *)
 (** [] *)
+Theorem and_example' : 
+  (beautiful 0) /\ (beautiful 3).
+Proof.
+  apply conj.
+   Case "left".  apply b_0.
+   Case "right".  apply b_3.  Qed.
+
+(*
+conj (beautiful 0) (beautiful 3) b_0 b_3
+     : beautiful 0 /\ beautiful 3
+conj (beautiful 0) (beautiful 3) (let Case := "left" in b_0)
+  (let Case := "right" in b_3)
+     : beautiful 0 /\ beautiful 3
+*)
 
 Theorem and_commut : forall P Q : Prop, 
   P /\ Q -> Q /\ P.
@@ -377,8 +448,31 @@ we get: *)
 (** **** Exercise: 2 stars, optional (conj_fact) *)
 (** Construct a proof object demonstrating the following proposition. *)
 
+Definition and_commut_def : forall P Q : Prop, P /\ Q -> Q /\ P :=
+fun (P Q : Prop) (H : P /\ Q) =>
+(fun H0 : Q /\ P => H0)
+  match H with
+  | conj HP HQ => (fun (HP0 : P) (HQ0 : Q) => conj Q P HQ0 HP0) HP HQ
+  end  
+.
+  
+Definition and_commut_def' : forall P Q : Prop, P /\ Q -> Q /\ P :=
+  fun (P Q : Prop) (H : P /\ Q) =>
+  match H with
+  | conj HP HQ => conj Q P HQ HP
+  end   
+.
+  
 Definition conj_fact : forall P Q R, P /\ Q -> Q /\ R -> P /\ R :=
-  (* FILL IN HERE *) admit.
+  fun (P Q R : Prop) (H1 : P /\ Q) (H2 : Q /\ R) =>
+  match H1 with
+  | conj H1P H1Q =>
+    match H2 with
+    | conj H2Q H2R => conj P R H1P H2R
+    end
+  end
+.
+
 (** [] *)
 
 
@@ -393,13 +487,43 @@ Definition conj_fact : forall P Q R, P /\ Q -> Q /\ R -> P /\ R :=
 
 Definition beautiful_iff_gorgeous :
   forall n, beautiful n <-> gorgeous n :=
-  (* FILL IN HERE *) admit.
+  fun (n : nat) => conj
+                     ((beautiful n) -> (gorgeous n))
+                     ((gorgeous n) -> (beautiful n))
+                   (beautiful__gorgeous n) (gorgeous__beautiful n).
 (** [] *)
 
 
 (** **** Exercise: 2 stars, optional (or_commut'') *)
 (** Try to write down an explicit proof object for [or_commut] (without
     using [Print] to peek at the ones we already defined!). *)
+
+(*
+Theorem or_commut'' : forall P Q : Prop, P \/ Q -> Q \/ P.
+Proof.
+  intros.
+  inversion H. right. auto. left. auto.
+Qed.
+Print or_commut''.
+*)
+
+Definition or_commut'' : forall P Q : Prop, P \/ Q -> Q \/ P :=
+  (*
+fun (P Q : Prop) (H : P \/ Q) =>
+(fun H0 : Q \/ P => H0)
+  match H with
+  | or_introl H0 => (fun H1 : P => or_intror Q P H1) H0
+  | or_intror H0 => (fun H1 : Q => or_introl Q P H1) H0
+  end  .
+*)
+  fun (P Q : Prop) (H : P \/ Q) =>
+  match H with
+  | or_introl HP => or_intror Q P HP
+(*    (fun H : P => or_intror Q P H) HP *)
+  | or_intror HQ => or_introl Q P HQ
+(*    (fun H : Q => or_introl Q P H) HQ *)
+  end
+.
 
 (* FILL IN HERE *)
 (** [] *)
@@ -410,23 +534,38 @@ We can choose to construct the proof explicitly.
 
 For example, consider this existentially quantified proposition: *)
 Check ex.
-
+(*
+Inductive ex (X : Type) (P : X -> Prop) : Prop :=
+    ex_intro : forall witness : X, P witness -> exists x, P x
+ex
+     : forall X : Type, (X -> Prop) -> Prop
+*)
 Definition some_nat_is_even : Prop := 
   ex _ ev.
 
 (** To prove this proposition, we need to choose a particular number
     as witness -- say, 4 -- and give some evidence that that number is
     even. *)
+Definition snie__ : some_nat_is_even := 
+  ex_intro _ ev 0 ev_0.
+Definition snie_ : some_nat_is_even := 
+  ex_intro _ ev 2 (ev_SS 0 ev_0).
 
 Definition snie : some_nat_is_even := 
   ex_intro _ ev 4 (ev_SS 2 (ev_SS 0 ev_0)).
 
-
 (** **** Exercise: 2 stars, optional (ex_beautiful_Sn) *)
 (** Complete the definition of the following proof object: *)
 
+
+Theorem pp : ex _ (fun n => beautiful (S n)).
+Proof. exists 2. apply b_3. Qed.
+(*   exists n : nat, beautiful (S n)*)
+  
 Definition p : ex _ (fun n => beautiful (S n)) :=
-(* FILL IN HERE *) admit.
+  ex_intro _ (fun n => beautiful (S n)) 2 b_3
+.
+
 (** [] *)
 
 
@@ -495,7 +634,11 @@ Example trans_eq_example' : forall (a b c d e f : nat),
      [c;d] = [e;f] ->
      [a;b] = [e;f].
 Proof.
-  (* FILL IN HERE *) Admitted.
+  intros.
+  inversion H...
+  inversion H0...
+  auto.
+Qed.
 (** [] *)
 
 
@@ -522,6 +665,29 @@ Print add1.
 
 Eval compute in add1 2. 
 (* ==> 3 : nat *)
+
+(*
+Definition len : forall X : Type, list X -> nat.
+intros X l.
+*)
+Definition len {X : Type} : list X -> nat.
+intros l.
+Show Proof.
+destruct l eqn:T.
+apply 0.
+Show Proof.
+apply S.
+apply (length l0).
+Defined.
+
+
+Theorem len_well_defined :
+  forall X : Type, forall l : (list X),
+  len l = length l.
+Proof with eauto.
+  intros.
+  induction l...
+Qed.  
 
 (** Notice that we terminate the [Definition] with a [.] rather than with
 [:=] followed by a term.  This tells Coq to enter proof scripting mode
