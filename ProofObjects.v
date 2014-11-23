@@ -189,6 +189,29 @@ Print eight_is_beautiful''.
 Print eight_is_beautiful'''.
 (* ===> eight_is_beautiful''' = b_sum 3 5 b_3 b_5 : beautiful 8 *)
 
+Theorem eighteen_is_beautiful : beautiful 18.
+Proof.
+  apply (b_sum 13 5).
+  apply (b_sum 8 5).
+  apply (b_sum 5 3).
+  apply b_5.
+  apply b_3.
+  apply b_5.
+  apply b_5.
+Qed.
+
+Theorem eighteen_is_beautiful' : beautiful 18.
+Proof.
+   apply (b_sum 3 15 b_3 (b_sum 10 5 (b_sum 5 5 b_5 b_5) b_5)).
+Qed.
+
+Definition eighteen_is_beautiful'' : beautiful 18 :=
+  (b_sum 3 15 b_3 (b_sum 3 12 b_3 (b_sum 3 9 b_3 (b_sum 3 6 b_3 (b_sum 3 3 b_3 b_3))))).
+  
+Print eighteen_is_beautiful.
+Print eighteen_is_beautiful'.
+Print eighteen_is_beautiful''.
+
 (** **** Exercise: 1 star (six_is_beautiful) *)
 (** Give a tactic proof and a proof object showing that [6] is [beautiful]. *)
 
@@ -259,7 +282,8 @@ Definition my_3 : forall n, beautiful n -> beautiful (3+n) :=
 Definition my_4 : forall n, forall _ : beautiful n, beautiful (3+n) := 
   fun (n : nat) => fun (H : beautiful n) =>
     b_sum 3 n b_3 H.
-
+Definition my_5 (n : nat) (H : beautiful n) := 
+    b_sum 3 n b_3 H.
 
 Definition b_plus3' : forall n, beautiful n -> beautiful (3+n) := 
   fun (n : nat) => fun (H : beautiful n) =>
