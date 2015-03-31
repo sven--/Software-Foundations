@@ -30,10 +30,90 @@ Check nat_ind.
     proofs.  Here, for example, is an alternate proof of a theorem
     that we saw in the [Basics] chapter. *)
 
+
+(*
+nat_rect
+fun (P : nat -> Type) (f : P 0) (f0 : forall n : nat, P n -> P (S n)) =>
+fix F (n : nat) : P n :=
+  match n as n0 return (P n0) with
+  | 0 => f
+  | S n0 => f0 n0 (F n0)
+  end
+     : forall P : nat -> Type,
+       P 0 -> (forall n : nat, P n -> P (S n)) -> forall n : nat, P n.
+*)
+
+Fixpoint my_nat_F (n : nat)(P : nat -> Type) (f : P 0) (f0 : forall n : nat, P n -> P (S n)) : P n :=
+  match n as n0 return (P n0) with
+  | 0 => f
+  | S n0 => f0 n0 (my_nat_F n0 P f f0)
+  end.
+
+
+(*
+Definition rectS {A} (P:forall {n}, t A (S n) -> Type)
+           (bas: forall a: A, P (a :: []))
+           (rect: forall a {n} (v: t A (S n)), P v -> P (a :: v)) :=
+  fix rectS_fix {n} (v: t A (S n)) : P v :=
+  match v with
+    |nil => fun devil => False_rect (@ID) devil
+    |cons a 0 v =>
+     match v as vnn in t _ nn
+           return
+           match nn,vnn with
+             |0,vm => P (a :: vm)
+             |S _,_ => _
+           end
+     with
+       |nil => bas a
+       |_ :: _ => fun devil => False_rect (@ID) devil
+     end
+    |cons a (S nn') v => rect a v (rectS_fix v)
+  end.
+*)
+
+Lemma my_nat_rect (P : nat -> Type) (f : P 0) (f0 : forall n : nat, P n -> P (S n)) :
+  (* fun (n : nat) => P n. *)
+  forall n : nat, P n.
+  (* P 0 -> (forall n : nat, P n -> P (S n)) -> forall n : nat, P n. *)
+Proof.
+  intros.
+  apply my_nat_F; auto.
+(*  induction n; auto. *)
+Qed.
+Check fun (n: nat) (P: nat -> Type) => P n.
+(* nat -> (nat -> Type) -> Type *)
+Check fun (P: nat -> Type) => forall n : nat, P n.
+(* (nat -> Type) -> Type *)
+
+(*
+Fixpoint my_nat_rect (P : nat -> Type) : Prop :=
+  match n with
+  | 0 => True
+  | S n0 => True
+  end.
+*)
+(*
+nat_ind
+fun P : nat -> Prop => nat_rect P
+     : forall P : nat -> Prop,
+       P 0 -> (forall n : nat, P n -> P (S n)) -> forall n : nat, P n.
+*)
+
+Lemma my_nat_ind : forall P : nat -> Prop,
+  P 0 ->
+  (forall n : nat, P n -> P (S n)) ->
+  forall n : nat, P n.
+Proof.
+(*  intros. induction n; auto. *)
+(*  intros. apply ((my_nat_rect P) H H0). *)
+  intro. apply (my_nat_rect P).
+Qed.
+
 Theorem mult_0_r' : forall n:nat, 
   n * 0 = 0.
 Proof.
-  apply nat_ind. 
+  apply my_nat_ind. 
   Case "O". reflexivity.
   Case "S". simpl. intros n IHn. rewrite -> IHn. 
     reflexivity.  Qed.
@@ -70,10 +150,12 @@ Proof.
 (** Complete this proof as we did [mult_0_r'] above, without using
     the [induction] tactic. *)
 
+  
+  
 Theorem plus_one_r' : forall n:nat, 
   n + 1 = S n.
 Proof.
-  apply nat_ind.
+  apply my_nat_ind.
   - auto.
   - intros.
     simpl.
@@ -124,6 +206,10 @@ Inductive rgb : Type :=
   | green : rgb
   | blue : rgb.
 Check rgb_ind.
+(*
+forall P : rgb -> Prop,
+P red -> P green -> P blue -> forall x : rgb, P x.
+*)
 (** [] *)
 
 (** Here's another example, this time with one of the constructors
@@ -150,7 +236,20 @@ Inductive natlist1 : Type :=
   | nsnoc1 : natlist1 -> nat -> natlist1.
 
 (** Now what will the induction principle look like? *)
+(*
+   natlist1_ind :
+      forall P : natlist1 -> Prop,
+         P nnil  ->
+         (forall (l : natlist1) (n : nat), P l -> P (ncons l n)) ->
+         forall n : natlist, P n *)
+Check natlist1_ind.
 (** [] *)
+(*
+     : forall P : natlist1 -> Prop,
+       P nnil1 ->
+       (forall n : natlist1, P n -> forall n0 : nat, P (nsnoc1 n n0)) ->
+       forall n : natlist1, P n
+*)
 
 (** From these examples, we can extract this general rule:
 
@@ -178,6 +277,24 @@ Inductive byntree : Type :=
  | bempty : byntree  
  | bleaf  : yesno -> byntree
  | nbranch : yesno -> byntree -> byntree -> byntree.
+(*
+forall P : byntree -> Prop,
+P bempty ->
+forall x : yesno, P (bleaf x) ->
+;forall x : yesno, l : byntree, r : byntree, P (nbranch x l r) ->
+forall x : yesno, l : byntree -> P l -> forall r : byntree, P r -> P (nbranch x l r) ->
+forall t : byntree, P t.
+*)
+Print byntree_ind.
+(*
+fun P : byntree -> Prop => byntree_rect P
+     : forall P : byntree -> Prop,
+       P bempty ->
+       (forall y : yesno, P (bleaf y)) ->
+       (forall (y : yesno) (b : byntree),
+        P b -> forall b0 : byntree, P b0 -> P (nbranch y b b0)) ->
+       forall b : byntree, P b
+*)
 (** [] *)
 
 
@@ -192,8 +309,10 @@ Inductive byntree : Type :=
     Give an [Inductive] definition of [ExSet]: *)
 
 Inductive ExSet : Type :=
-  (* FILL IN HERE *)
+  | con1 : bool -> ExSet
+  | con2 : nat -> ExSet -> ExSet
 .
+Print ExSet_ind.
 (** [] *)
 
 (** What about polymorphic datatypes?
@@ -227,7 +346,20 @@ Inductive ExSet : Type :=
 Inductive tree (X:Type) : Type :=
   | leaf : X -> tree X
   | node : tree X -> tree X -> tree X.
+(*
+tree_ind :
+forall (X : Type) (P : tree X -> Prop),
+forall (x : X), P (leaf X x) ->
+forall (l : tree X), P l -> forall (r : tree X), P r -> P (node X l r) ->
+forall (t : tree X), P t.
+*)
 Check tree_ind.
+(*
+forall (X : Type) (P : tree X -> Prop),
+    (forall x : X, P (leaf X x)) ->
+    (forall t : tree X, P t -> forall t0 : tree X, P t0 -> P (node X t t0)) ->
+    forall t : tree X, P t
+*)
 (** [] *)
 
 (** **** Exercise: 1 star, optional (mytype) *)
@@ -240,7 +372,13 @@ Check tree_ind.
             (forall m : mytype X, P m -> 
                forall n : nat, P (constr3 X m n)) ->
             forall m : mytype X, P m                   
-*) 
+*)
+Inductive mytype (X : Type) : Type :=
+  | constr1 : X -> mytype X
+  | constr2 : nat -> mytype X
+  | constr3 : mytype X -> nat -> mytype X
+.
+Print mytype_ind.
 (** [] *)
 
 (** **** Exercise: 1 star, optional (foo) *)
@@ -255,6 +393,11 @@ Check tree_ind.
              forall f2 : foo X Y, P f2       
 *) 
 (** [] *)
+Inductive foo (X Y : Type) : Type :=
+  | bar : X -> foo X Y
+  | baz : Y -> foo X Y
+  | quux : (nat -> foo X Y) -> foo X Y.
+Print foo_ind.
 
 (** **** Exercise: 1 star, optional (foo') *)
 (** Consider the following inductive definition: *)
@@ -264,14 +407,23 @@ Inductive foo' (X:Type) : Type :=
   | C2 : foo' X.
 
 (** What induction principle will Coq generate for [foo']?  Fill
-   in the blanks, then check your answer with Coq.)
+   in the blanks, then check your answer with Coq.
      foo'_ind :
         forall (X : Type) (P : foo' X -> Prop),
               (forall (l : list X) (f : foo' X),
-                    _______________________ -> 
-                    _______________________   ) ->
-             ___________________________________________ ->
-             forall f : foo' X, ________________________
+                    P f -> 
+                    P (C1 l f)   ) ->
+             P C2 ->
+             forall f : foo' X, P f.
+*)
+Print foo'_ind.
+(*
+fun (X : Type) (P : foo' X -> Prop) => foo'_rect X P
+     : forall (X : Type) (P : foo' X -> Prop),
+       (forall (l : list X) (f : foo' X), P f -> P (C1 X l f)) ->
+       P (C2 X) -> forall f1 : foo' X, P f1
+C1 X
+C2 X
 *)
 
 (** [] *)
